@@ -1,0 +1,124 @@
+classdef createMethodsFigure < FigurePipeline
+
+    % a) example track
+    % b) example traces
+    % c) example histology electrode placement
+    % d) raw example trace
+    % e) th example trace
+    % f) ripple example trace
+    % g) ex raster
+    % h) example place cells
+    % i) violin plots for summary stats
+    % j) more summary stats (m vs f?)
+    % k) exp timeline - to be added in illustrator
+    % Load behavioral data
+
+    properties
+        SpikeTable
+        TimeIntervalCombined
+        ClusterInfo
+        Info
+        Probe
+            
+    end
+
+    methods(Static)
+        
+        function data = loadData()
+
+
+
+        end
+
+        function filepath = exampleTraces(figtype,savefig)
+        % example traces: raw, theta, swr
+
+        sf = neuro.spike.SpikeFactory.instance();
+        sa = sf.getPhyOutputFolder;
+        
+
+
+        end
+
+
+
+
+
+        function obj = plotFigure()
+
+            positionData = FigurePipeline.loadPositionData;
+
+            h1 = figure;
+            grid_height = 6; grid_width = 6;
+            tiledlayout(grid_height,grid_width);
+
+            %%a - example track: add in illustrator
+            % position = 1; height = 2; width = 2; nexttile(position,[height,width]);
+
+            %%b example behavior
+            position = 13; height = 1; width = 1; nexttile(position,[height,width]);
+
+            plot(positionData.data.X,positionData.data.Z,'LineWidth',2)
+
+            %%c - histology placement: add in illustrator
+            % position = 14; height = 1; width = 1; nexttile(position,[height,width]);
+
+            %%d raw example trace
+            position = 3; height = 1; width = 4; nexttile(position,[height,width]);
+
+            %%e theta example trace
+            position = 9; height = 1; width = 4; nexttile(position,[height,width]);
+
+            %%f ripple example trace
+            position = 15; height = 1; width = 4; nexttile(position,[height,width]);
+
+            %%g example raster
+            position = 21; height = 1; width = 4; nexttile(position,[height,width]);
+
+            sf = neuro.spike.SpikeFactory.instance();
+            sa = sf.getPhyOutputFolder; % to access the SpikeArray class - provide GUI folder
+
+            %%first argument is what column to sort into different figures, second arg
+            %is the filepath to which to save figures (kills matlab with too many
+            %units!)
+            sa.plotRaster('sh','/home/wahlberg/merged_20230614crs.GUI/Figures/')
+
+
+            %%h example placecells (includes nested tiledlayout)
+            position = 19; height = 2; width = 2; nexttile(position,[height,width]);
+
+            % neuro.spike.spikeUnit
+
+            spikeIDs = sa.getspikeIDs;
+            st = sa.getSpikeTimes;
+            ticd = neuro.time.TimeIntervalCombined(phyfolder);
+
+            su = neuro.spike.SpikeUnit(spikeIDs,st,ticd); %
+
+
+            %%i violin plots for summary stats
+            position = 27; height = 1; width = 2; nexttile(position,[height,width]);
+
+            %%j more summary stats?
+            position = 29; height = 1; width = 2; nexttile(position,[height,width]);
+
+        end
+
+            function [] = saveFigure()
+
+
+
+            end
+
+
+
+
+
+    end
+
+end
+
+
+
+
+
