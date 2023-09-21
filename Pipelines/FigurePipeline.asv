@@ -25,11 +25,12 @@ classdef (Abstract) FigurePipeline < handle
         behaviorpath = '/data/ExperimentsRSW/CircularMaze/Harry/CA1/20230614/merged_20230614/behaviorfiles/';
         phypath = '/home/wahlberg/merged_20230614crs.GUI/';
         optipath = '/data/ExperimentsRSW/CircularMaze/Harry/CA1/20230614/Optitrack';
-        SpikeTable
+        SpikeTableInSamples
         ClusterInfo
         Info
         positionData
         TimeIntervalCombined
+        Events
     end % does NOT include LFP for more flexibility on channel selection
 
     methods(Abstract)
@@ -37,7 +38,6 @@ classdef (Abstract) FigurePipeline < handle
         plotFigure(obj)
         saveFigure(obj)
     end
-
 
     %% FUNCTIONS
 
@@ -50,20 +50,24 @@ classdef (Abstract) FigurePipeline < handle
             sf = neuro.spike.SpikeFactory.instance(); %Spike Factory (Kaya code)
             sa = sf.getPhyOutputFolder(obj.phypath); %Spike Array (Kaya code)
 
-            obj.SpikeTable = sa.SpikeTable;
+            obj.SpikeTableInSamples = sa.SpikeTableInSamples;
             obj.ClusterInfo = sa.ClusterInfo;
             obj.Info = obj.Info;
+            
+            %get absoulute times for epoch start/end and rule switch
+            obj.Events = readtable([obj.basepath '/' obj.basename '_events.xlsx']); %xlsx allows format to stay, whereas csv wouldn't
 
-            obj.positionData = loadPositionData(obj);
+           % p = obj.loadPositionData; % a position.PositionData object.
+            obj.positionData = obj.loadPositionData;
 
             %%%%%%%%%%%%%% timestamps %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-            theFile=dir(fullfile(obj.phypath,['*1250Hz.TimeIntervalCombined*' '.csv'])); %TIC file gives timing info for each pre-merge file
+            theFile=dir(fullfile(obj.phypath,['*TimeIntervalCombined*' '.csv'])); %TIC file gives timing info for each pre-merge file
             if isempty(theFile)
                 logger.warning(strcat('TimeIntervalCombined is not loaded. \n\tLocation:\t',foldername,'\n'));
             end
 
-            ticd=neuro.time.TimeIntervalCombined(fullfile(theFile.folder, theFile.name)); % from the neuro.time folder
+            ticd=time.TimeIntervalCombined(fullfile(theFile.folder, theFile.name)); % from the time folder
             ticd = ticd.setZeitgeberTime(hours(12)); % for noon start, dark to light transition
             obj.TimeIntervalCombined = ticd; %pulling the 1250Hz version!
 
@@ -72,21 +76,38 @@ classdef (Abstract) FigurePipeline < handle
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%% LOAD POSITION DATA %%%%%%%%%%%%%%%%%%
 
         function positionData = loadPositionData(obj)
-            %optifolder = '/data/ExperimentsRSW/CircularMaze/20230614/Optitrack';
-
             fnames = dir(fullfile(obj.optipath,sprintf('*Take*')));
+            oploader = position.optiTrack.OptiLoader.instance();
             %filenames =  {fnames(:).name};
             for f = 1:length(fnames)
-                filenames{f} = fullfile(obj.optipath,fnames(f).name);
+                filename= fullfile(obj.optipath,fnames(f).name);
+                op = oploader.loadFile(filename);
+                pos0 = op.Positions;
+                savefolder = [];
+                pd_unmerged{f}=position.fillRigidBodyNans(pos0,savefolder);
+
+                if ~exist("positionData")
+                    positionData = pd_unmerged{f};
+                else
+                    positionData.data = [positionData.data; pd_unmerged{f}.data(:,{'X','Y','Z'})];
+                    positionData.time = positionData.time + pd_unmerged{f}.time;
+                end
             end
+      end
 
-            ot = optiTrack.OptiLoader.instance();
-            op = ot.loadFile(filenames);
-            positionData = op.getMergedPositionData;
+%         function interpolatedData = interpPositionData(obj) %OLD (now use fillRigidBodyNans)
+% 
+%             interpolatedData = obj.positionData;
+%             rawx = obj.positionData.data.X; 
+%             rawy = obj.positionData.data.Y; 
+%             rawz = obj.positionData.data.Z; 
+% 
+%             %rewrite
+%             interpolatedData.data.X = interp1(t,rawx,spks,'nearest');   % Align the position of the animal when the cell spikes to an x-grid position
+%             yint = interp1(t,yb,spks,'nearest');   % Align the position of the animal when the cell spikes to an y-grid position
+%         end
 
-        end
-
-         function [] = getWavelet(obj,timeframe,freq)
+        function [] = getWavelet(obj,timeframe,freq)
             % timeframe in [start end] format, in seconds
             % frequency in hz, [low high]
             %%%%%%%%%%% Buzcode wavelet funtion (Morlet) %%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -103,15 +124,13 @@ classdef (Abstract) FigurePipeline < handle
 
             figure
             hold all
-            title(['Ch ' num2str(obj.LFP.ChannelName) ', ' ... 
+            title(['Ch ' num2str(obj.LFP.ChannelName) ', ' ...
                 num2str(timeframe(1)) '-' num2str(timeframe(2)) ' sec' ]);
             imagesc(wavespec.timestamps,wavespec.freqs,(abs(wavespec.data))');
             ax = gca;
             ax.YDir = 'normal'; ax.YScale="log"; ax.YLim = [0.5 300]; ax.XLim = [min(wavespec.timestamps) max(wavespec.timestamps)];
             colorbar; ax.CLim=[0 300];
-         end
-
-
+        end
 
 %         %%%%%%%%%%%%%%%%%%%%%%%%%% CREATE METHODS FIGURE %%%%%%%%%%%%%%%%%%
 %         function [] = callMethods()

@@ -112,6 +112,13 @@ classdef AutoCorrelogram
             count=obj.Count;
             t=obj.Time;
         end
+
+        function tbl = plotSingleHistogram(obj) %histogram for a single cell
+            bar(obj.Time,obj.Count,'blue');
+            xlabel('time')
+            ylabel('count')
+        end
+
         function [tbl]=plot(obj,group,sort1)
             tbl=obj.Info;
             [type,~,gr]=unique(tbl(:,group));
@@ -147,46 +154,50 @@ classdef AutoCorrelogram
             ax=gca;
             ax.CLim=[.7 1.2];
             colormap('pink');
-            popmean=mean(mat)*size(mat,1)/5;
-            new_t=min(obj.Time):.001:max(obj.Time);
-            popmean=spline(obj.Time,popmean,new_t);
-            hold on;
-            s1=scatter(peak,1:size(mat,1),15,tbl.color);
-            s1.MarkerEdgeAlpha=.7;
-            s2=scatter(2*peak,1:size(mat,1),10,tbl.color);
-            s2.MarkerEdgeAlpha=.7;
 
-            t_interest=new_t>.05&new_t<.200;
-            [pks,locs] =findpeaks(popmean(:,t_interest),new_t(t_interest),'NPeaks',1);
-            p=plot(new_t,popmean);
-            p.LineWidth=2;
-            p.Color='#A2142F';
-            ax.YDir='normal';
-            freq=1/locs(1);
-            s3=scatter([-locs locs],[pks pks],'v','filled','MarkerFaceColor','#A2142F');
-            t=text(locs,pks,sprintf('%.2fHz',freq),'VerticalAlignment','bottom','HorizontalAlignment','center');
-            t.FontSize=10;
-            t.Color='#A2142F';
-            units_interest=1:numel(tbl.thetaFreq);
-            mean_inter_peak=peak(units_interest);
-            treq_mean_peak=mean(mean_inter_peak);            
-%             eb=errorbar(treq_mean_peak,numel(t_freq)/2,std(mean_inter_peak)/sqrt(numel(mean_inter_peak)),'horizontal');
-            xl=xline(treq_mean_peak);
-            xl.Color=colors_peak(1,:);
-            xl.LineWidth=1;
-            t2=text(treq_mean_peak,numel(tbl.thetaFreq)/2,sprintf('%.2fHz',1/treq_mean_peak),'VerticalAlignment','bottom','HorizontalAlignment','center');
-            t2.Color=xl.Color;
-            t2.FontSize=10;
-            ax.XLim=[0 .400];
-            for ity=1:height(type)
-                txt2=table2cell(type(ity,:));
-                try
-                    for it=1:numel(txt2),txt2{it}=txt2{it}(1:3);end
-                catch
+            if height(tbl)>1
+                popmean=mean(mat)*size(mat,1)/5;
+                new_t=min(obj.Time):.001:max(obj.Time);
+                popmean=spline(obj.Time,popmean,new_t);
+                hold on;
+                s1=scatter(peak,1:size(mat,1),15,tbl.color);
+                s1.MarkerEdgeAlpha=.7;
+                s2=scatter(2*peak,1:size(mat,1),10,tbl.color);
+                s2.MarkerEdgeAlpha=.7;
+
+                t_interest=new_t>.05&new_t<.200;
+                [pks,locs] =findpeaks(popmean(:,t_interest),new_t(t_interest),'NPeaks',1);
+                p=plot(new_t,popmean);
+                p.LineWidth=2;
+                p.Color='#A2142F';
+                ax.YDir='normal';
+                freq=1/locs(1);
+                s3=scatter([-locs locs],[pks pks],'v','filled','MarkerFaceColor','#A2142F');
+                t=text(locs,pks,sprintf('%.2fHz',freq),'VerticalAlignment','bottom','HorizontalAlignment','center');
+                t.FontSize=10;
+                t.Color='#A2142F';
+                units_interest=1:numel(tbl.thetaFreq);
+                mean_inter_peak=peak(units_interest);
+                treq_mean_peak=mean(mean_inter_peak);
+                %             eb=errorbar(treq_mean_peak,numel(t_freq)/2,std(mean_inter_peak)/sqrt(numel(mean_inter_peak)),'horizontal');
+                xl=xline(treq_mean_peak);
+                xl.Color=colors_peak(1,:);
+                xl.LineWidth=1;
+                t2=text(treq_mean_peak,numel(tbl.thetaFreq)/2,sprintf('%.2fHz',1/treq_mean_peak),'VerticalAlignment','bottom','HorizontalAlignment','center');
+                t2.Color=xl.Color;
+                t2.FontSize=10;
+                ax.XLim=[0 .400];
+                for ity=1:height(type)
+                    txt2=table2cell(type(ity,:));
+                    try
+                        for it=1:numel(txt2),txt2{it}=txt2{it}(1:3);end
+                    catch
+                    end
+                    txt2{1} = char(txt2{1});
+                    txt=strjoin(txt2);
+                    text(1,.5-.1*(mean(1:height(type))-ity),txt,'Color',colors_peak(ity,:),Units='normalized')
                 end
-                txt2{1} = char(txt2{1});
-                txt=strjoin(txt2);
-                text(1,.5-.1*(mean(1:height(type))-ity),txt,'Color',colors_peak(ity,:),Units='normalized')
+
             end
         end
     end

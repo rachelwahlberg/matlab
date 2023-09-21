@@ -70,13 +70,7 @@ classdef MethodsFigure < FigurePipeline
         function [] = getPSD(obj)
 
 
-
-
-
-
         end
-
-
 
         function [] = spikeRaster(obj)
 
@@ -91,31 +85,163 @@ classdef MethodsFigure < FigurePipeline
         end
 
 
-        function placeCells = getPlaceCells(obj)
+        function [] = plotPlaceMaps(obj,idx) %Occupancy currently looks cut off!
+    
             % each place cell in a cell
-            speedthreshold = 5;
+            %idx = 'class';
+            import neuro.spike.*
+            import neuro.placeField.*
 
+            % pd_ontrack = obj.positionData.getTimeWindow(timewindow)
             sf = neuro.spike.SpikeFactory.instance(); %Spike Factory (Kaya code)
             sa = sf.getPhyOutputFolder(obj.phypath); %Spike Array (Kaya code)
-            spikeUnits = sa.getSpikeUnits();
-                
-            spikeUnits.plotPlaceFieldBoth(obj.positionData,speedthreshold)
+            sat = SpikeArrayTrack(sa,obj.positionData); %SpikeArrayTrack (Kaya)
             
-            
+            classTypes = unique(sa.ClusterInfo.class);
+            nclassTypes = length(classTypes);
+            nUnits = height(sa.ClusterInfo);
 
+            %get acg for entire session before cutting down to just task ep
+            [~,acg_wholesession] = obj.getEntireSession(sa);
+            saTrack = sa.getTimeInterval([obj.Events.taskStart, obj.Events.taskEnd]); 
+            [sut_Track,acg_Track] = obj.getEntireSession(saTrack);
 
+            %get place fields for individual units
+            saTrack_pair1 = sa.getTimeInterval([obj.Events.taskStart, obj.Events.ruleSwitch]); %just for during task for now
+            saTrack_pair2 = sa.getTimeInterval([obj.Events.ruleSwitch, obj.Events.taskEnd]); %just for during task for now
+           
+            [sut1,acgTask1,frm1,pfm1] = obj.getPlaceFields(saTrack_pair1);
+            [sut2,acgTask2,frm2,pfm2] = obj.getPlaceFields(saTrack_pair2);
 
+            % plot
+            error = [];
+            figure
+            for c = 1%:nclassTypes
+                class = classTypes(c);
+                for unit = 1%:nUnits %1:length(pfm{c})
 
+                    grid_height = 3; grid_width = 5;
+                    h1 = tiledlayout(grid_height,grid_width);
+                    title(h1,['Class ' num2str(class) ', unit ' num2str(unit)])
+                    position = 1; h = 3; w = 1; ax1 = nexttile(position,[h,w]); %3D plot
+                    position = 2; h = 2; w = 2; ax2 = nexttile(position,[h,w]); %place field pair 1
+                    position = 4; h = 2; w = 2; ax4 = nexttile(position,[h,w]); %place field pair 2
+                    position =  12; h = 1; w = 1; ax12 = nexttile(position,[h,w]); % acg whole session
+                    position =  13; h = 1; w = 1; ax13 = nexttile(position,[h,w]);  %acg just task
+                    position =  14; h = 1; w = 1; ax14 = nexttile(position,[h,w]); % waveform entire session
 
+                    % AX1: plots position data vertically over time, and then the locations of unit firing
+                    axes(ax1)
+                    %hold on
+                    %title('Position Firing over Time')
+                    try
+                    sut_Track{c}{unit}.plotOnTrack3D;
+                    hold on
+                    sut_Track{c}{unit}.plot3DEvent(obj.Events)
+                    s%catter(-50,obj.Event.ruleSwitch,0)
+                    catch; end
+                    %hold off
 
+                    % AX2: Plots occupancy and firing rate map
+                    axes(ax2)
+                    try; hold on
+                    title('Firing Rate Map Pair 1')
+                    frm1{c}{unit}.plotSmooth;
+                    hold off
+                    catch; end
 
-            neuro.placecells.tuningcurves2D(behaviortimestamps,phyoutputpath,'trials',trials,'labelstouse',1:2,'showplots',true); %false);
+                    % AX4: Plots occupancy and firing rate map
+                    axes(ax4)
+                    try; hold on
+                    title('Firing Rate Map Pair 2')
+                    frm2{c}{unit}.plotSmooth;
+                    hold off
+                    catch; end
 
-            [FRmaps,xbins,ybins,empties] = place_cells03_RW(behaviortimestamps,optitrack,phyoutputpath,'labelstouse',1:2,'placecellplots',true); %false);
+                    %AX3: Plots acg (for entire session)
+                    axes(ax12)
+                    try; hold on
+                    title('ACG for entire session')
+                    acg_wholesession{c}{unit}.plotSingleHistogram
+                    hold off
+                    catch; end
 
+                      %AX13: Plots acg (for entire session)
+                    axes(ax13)
+                    try; hold on
+                    title('ACG for task epoch')
+                    acg_Track{c}{unit}.plotSingleHistogram
+                    hold off
+                    catch; end
+
+                    %AX4 Plots waveform for entire session
+
+%                     % AX6: Plots place field map % isn't currently working
+%                     axes(ax6)
+%                     hold on
+%                     %title('Place Field Map')
+%                     pfm{c}{unit}.plot;
+%                     hold off
+
+                    pause
+                    clf
+                  %  end
+%                     catch
+%                     error{c}{unit} = 1;
+%                     end
+            end
+        end
         end
 
+        function [sut,acg] = getEntireSession(obj,sa)
 
+            % get ACGs and waveforms BEFORE grabbing out just the task ep
+            spikeUnits = sa.getSpikeUnits();
+            classTypes = unique(sa.ClusterInfo.class);
+            for c = 1%:3%length(classTypes)
+                class = classTypes(c);
+                unitcount = 1;
+                for unit = 1%:length(spikeUnits)
+                    if spikeUnits(unit).Info.class == class
+                        try
+                            sut{c}{unit} = neuro.spike.SpikeUnitTracked(spikeUnits(unit),obj.positionData);
+                            acg{c}{unitcount} = sut{c}{unit}.getACC;
+                        catch
+                            sut{c}{unit} = [];
+                            acg{c}{unitcount} = [];
+                        end
+                        unitcount = unitcount + 1;
+                    end
+                    unit
+                end
+            end
+        end
+
+        function [sut,acgTask,frm,pfm] = getPlaceFields(obj,sa)
+            spikeUnits = sa.getSpikeUnits();
+            classTypes = unique(sa.ClusterInfo.class);
+
+            for c = 1%:3%length(classTypes)
+                class = classTypes(c);
+                unitcount = 1;
+                for unit = 1%:length(spikeUnits)
+                    if spikeUnits(unit).Info.class == class
+                        try
+                            sut{c}{unitcount} = neuro.spike.SpikeUnitTracked(spikeUnits(unit),obj.positionData);
+                            acgTask{c}{unitcount} = sut{c}{unitcount}.getACC;
+                            frm{c}{unitcount} = sut{class}{unitcount}.getFireRateMap; %underlay is occupancy map
+                            pfm{c}{unitcount} = frm{c}{unitcount}.getPlaceFieldMap;
+                        catch
+                            sut{c}{unitcount} = [];
+                            acgTask{c}{unitcount} = [];
+                            pfm{c}{unitcount} = [];
+                        end
+                        unitcount = unitcount + 1;
+                    end
+                    unit
+                end
+            end
+        end
 
         function [] = testSubplots(obj,toplot) % so you can test ind. figures,
             %or plot into a full figure with plotfullfig

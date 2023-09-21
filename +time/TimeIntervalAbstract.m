@@ -18,7 +18,7 @@ classdef TimeIntervalAbstract
         getDownsampled(obj, downsampleFactor)
         plot(obj)
         getStartTime(obj)
-        getTimePointsInSec(obj)
+        getTimePoints(obj)
         getTimePointsInAbsoluteTimes(obj)
         getNumberOfPoints(obj)
         getSampleRate(obj)
@@ -37,7 +37,8 @@ classdef TimeIntervalAbstract
         function ts=getTimeSeriesDownsampled(obj,downsampleFactor)
             ts=timeseries(ones(round(obj.getNumberOfPoints/downsampleFactor),1));
             ts.TimeInfo.Units='seconds';
-            ts=ts.setuniformtime('StartTime', 0,'Interval',1/obj.getSampleRate*downsampleFactor);
+            ts=ts.setuniformtime('StartTime', 0,'Interval',...
+                1/obj.getSampleRate*downsampleFactor);
             ts.TimeInfo.StartDate=obj.getStartTime;
             ts.TimeInfo.Format='HH:MM:SS.FFF';
         end
@@ -52,13 +53,36 @@ classdef TimeIntervalAbstract
             catch
                 dt1=datetime(time,'InputFormat','HH:mm');
             end
-            dt=datetime(st.Year,st.Month,st.Day)+hours(dt1.Hour)+minutes(dt1.Minute)+seconds(dt1.Second);
+            dt=datetime(st.Year,st.Month,st.Day)+hours(dt1.Hour)+...
+                minutes(dt1.Minute)+seconds(dt1.Second);
+        end
+        function dtDuration=getDataTime(obj,absouluteTime)
+            for i=1:numel(absouluteTime)
+                duration=seconds(obj.getSampleForClosest(absouluteTime(i))...
+                    /obj.getSampleRate);
+                dtDuration(i)=time.DurationNeuroscope(duration);
+            end
+        end
+        function dur=getDuration(obj)
+            %METHOD1 Summary of this method goes here
+            %   Detailed explanation goes here
+            dur=obj.getEndTime-obj.getStartTime;
+        end
+        function absTime=getAbsoluteTime(obj,dataTimeInDuration)
+            absTime=obj.getRealTimeFor(seconds(dataTimeInDuration)*...
+                obj.getSampleRate);
         end
         function times=getDatetime(obj,times)
             % Convert times of duration or string('HH:mm') to datetime format.
             if ~isdatetime(times)
                 if isduration(times)
                     times=obj.convertDurationToDatetime(times);
+                elseif isa(times,"time.Relative")
+                    times=times.pointsAbsolute;           
+                elseif isa(times,"time.ZeitgeberTime")
+                    times=times.pointsAbsolute;
+                elseif isa(times,"time.Absolute")
+                    times=times.points;
                 elseif iscell(times)
                     if (isstring(times{1})||ischar(times{1}))
                         times = obj.convertStringToDatetime(times);
@@ -71,7 +95,7 @@ classdef TimeIntervalAbstract
             end
         end
         function date=getDate(obj)
-            st=obj.getEndTime;
+            st=obj.getStartTime;
             date=datetime( st.Year,st.Month,st.Day);
         end
         function tps=getTimePointsInSamples(obj)

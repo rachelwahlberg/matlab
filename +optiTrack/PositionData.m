@@ -205,7 +205,7 @@ classdef PositionData
             if isfile(folder)
                 folder=fileparts(folder);
             end
-            obj.timeIntervalCombined=neuro.time.TimeIntervalCombined( ...
+            obj.timeIntervalCombined=time.TimeIntervalCombined( ...
                 fullfile(folder,[uni extt]));
         end
         function [file2, uni]=getFile(~,folder,extension)
@@ -229,7 +229,7 @@ classdef PositionData
             uni1=split([name ext1],extension);
             uni=uni1{1};
         end
-        
+
 %         function [X,Y,Z,idx]= getPositionForTimesBoth(obj,times,speedthreshold)
 %             ticd=obj.timeIntervalCombined;
 %             speedTrack=obj.getSpeed;

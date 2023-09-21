@@ -1,4 +1,4 @@
-classdef OptiFile < neuro.time.Timelined
+classdef OptiFile < time.Timelined
     %OPTIFILE Summary of this class goes here
     %   Detailed explanation goes here
     
@@ -88,11 +88,11 @@ classdef OptiFile < neuro.time.Timelined
             ts=ts.addsample('Data',false,'Time',ts.Time(1)-step);
             ts=ts.addsample('Data',false,'Time',ts.Time(end)+step);
         end
-        function ti = getTimeInterval(obj)
+        function ti = getTimeInterval(obj) %gets from file, not ticd file
             startTime=obj.getStartTime;
             sampleRate=obj.getSampleRate;
             numPoints=obj.getNumFrames;
-            ti=neuro.time.TimeInterval(startTime,sampleRate,numPoints);
+            ti=time.TimeInterval(startTime,sampleRate,numPoints);
         end
     end
 end

@@ -1,23 +1,24 @@
-classdef Oscillation
+classdef Oscillation < neuro.basic.TimeSeries
     %OSCILLATION Summary of this class goes here
     %   Detailed explanation goes here
     properties (Access=public)
-        Values
-        SampleRate
+
     end
     methods
         function obj = Oscillation(values, sampleRate)
             %OSCILLATION Construct an instance of this class
             %   Detailed explanation goes here
-            obj.SampleRate=sampleRate;
-            sz=size(values);
-            if sz(1)>sz(2)
-                values=values';
-            end
-            if ~isa(values,'double')
-                obj.Values=double(values);
-            else
-                obj.Values=values;
+            if nargin>0
+                obj.SampleRate=sampleRate;
+                sz=size(values);
+                if sz(1)>sz(2)
+                    values=values';
+                end
+                if ~isa(values,'double')
+                    obj.Values=double(values);
+                else
+                    obj.Values=values;
+                end
             end
         end
         function timeFrequencyMap = getTimeFrequencyMap(obj,...
@@ -36,36 +37,14 @@ classdef Oscillation
                 obj.Values, obj.getSampleRate);
             timeFrequencyMap=timeFrequencyMap.setTimeintervalCombined(ticd1);
         end
-        function p1=plot(obj,varargin)
-            ts=obj.getTimeStamps;
-            vals=obj.getValues;
-            p1=plot(ts,vals,varargin{:});
-%             ax=gca;
-%             ax.XLim=[ts(1) ts(end)];
-        end
-
-        function obj=getDownSampled(obj,newRate)
-            ratio=obj.SampleRate/newRate;
-            obj.Values=downsample(obj.getValues,ratio);
-            obj.SampleRate=newRate;
-        end
-        function obj=getReSampled(obj,newRate)
-            obj.Values=resample(obj.getValues, newRate,obj.getSampleRate);
-            obj.SampleRate=newRate;
-        end
-        function obj=getFillMissing(obj,window)    
-            obj.Values=fillmissing(obj.getValues,"movmedian",window*obj.SampleRate);
-        end
         function ps=getPSpectrum(obj)
             [pxx,f] = pspectrum(double(obj.Values),obj.getSampleRate,...
                 'FrequencyLimits',[1 250]);
             ps=neuro.power.PowerSpectrum(pxx,f);
         end
-        function l=getLength(obj)
-            l=seconds(obj.getNumberOfPoints/obj.getSampleRate);
-        end
+
         function ps=getPSpectrumChronux(obj)
-%             params.tapers=[3 5];
+            %             params.tapers=[3 5];
             params.Fs=obj.getSampleRate;
             params.fpass=[1 250];
             [S,f] = mtspectrumc( obj.Values, params );
@@ -74,7 +53,8 @@ classdef Oscillation
         function ps=getPSpectrumWelch(osc)
             window=2*osc.getSampleRate;
             overlap=window/2;
-            [psd, freqs] = pwelch(osc.Values, window, overlap, [], osc.getSampleRate);
+            [psd, freqs] = pwelch(osc.Values, window, overlap, [], ...
+                osc.getSampleRate);
             ps=neuro.power.PowerSpectrum(psd,freqs);
         end
         function specslope=getPSpectrumSlope(osc)
@@ -83,12 +63,6 @@ classdef Oscillation
             LFP.samplingRate=osc.getSampleRate;
             [specslope,~] = bz_PowerSpectrumSlope(LFP,3,1,...
                 'frange',[4 250],'nfreqs',250,'showfig',false);
-        end
-        function np=getNumberOfPoints(osc)
-            np=numel(osc.Values);
-        end
-        function ts=getTimeStamps(osc)
-            ts=linspace(0, osc.getNumberOfPoints/osc.getSampleRate, osc.getNumberOfPoints);
         end
         function obj=getWhitened_Obsolete(obj, fraquencyRange)
             Fs=obj.SampleRate;
@@ -102,7 +76,73 @@ classdef Oscillation
             obj.Values=x_whitened';
         end
         function obj=getWhitened(obj)
-            obj.Values = reshape(external.WhitenSignal(obj.Values,[],1),size(obj.Values));
+            obj.Values = reshape(external.WhitenSignal(obj.Values,[],1), ...
+                size(obj.Values));
+        end
+        function obj=getHilbertPhase(obj)
+            obj.Values = angle(hilbert(double(obj.Values)));
+        end
+        function obj=getHilbertPhaseKamran(obj,n)
+            %HILBERT  Discrete-time analytic signal via Hilbert transform.
+            %   X = HILBERT(Xr) computes the so-called discrete-time analytic signal
+            %   X = Xr + i*Xi such that Xi is the Hilbert transform of real vector Xr.
+            %   If the input Xr is complex, then only the real part is used: Xr=real(Xr).
+            %   If Xr is a matrix, then HILBERT operates along the columns of Xr.
+            %
+            %   HILBERT(Xr,N) computes the N-point Hilbert transform.  Xr is padded with
+            %   zeros if it has less than N points, and truncated if it has more.
+            %
+            %   For a discrete-time analytic signal X, the last half of fft(X) is zero,
+            %   and the first (DC) and center (Nyquist) elements of fft(X) are purely real.
+            %
+            %   Example:
+            %     Xr = [1 2 3 4];
+            %     X = hilbert(Xr)
+            %   produces X=[1+1i 2-1i 3-1i 4+1i] such that Xi=imag(X)=[1 -1 -1 1] is the
+            %   Hilbert transform of Xr, and Xr=real(X)=[1 2 3 4].  Note that the last half
+            %   of fft(X)=[10 -4+4i -2 0] is zero (in this example, the last half is just
+            %   the last element).  Also note that the DC and Nyquist elements of fft(X)
+            %   (10 and -2) are purely real.
+            %
+            %   See also FFT, IFFT.
+
+
+            %   References:
+            %     [1] Alan V. Oppenheim and Ronald W. Schafer, Discrete-Time
+            %     Signal Processing, 2nd ed., Prentice-Hall, Upper Saddle River,
+            %     New Jersey, 1998.
+            %
+            %     [2] S. Lawrence Marple, Jr., Computing the discrete-time analytic
+            %     signal via FFT, IEEE Transactions on Signal Processing, Vol. 47,
+            %     No. 9, September 1999, pp.2600--2603.
+            xr=double(obj.Values);
+            if nargin<2, n=[]; end
+            if ~isreal(xr)
+                warning('HILBERT ignores imaginary part of input.')
+                xr = real(xr);
+            end
+            % Work along the first nonsingleton dimension
+            [xr,nshifts] = shiftdim(xr);
+            if isempty(n)
+                n = size(xr,1);
+            end
+            x = fft(xr,n,1); % n-point FFT over columns.
+            h  = zeros(n,~isempty(x)); % nx1 for nonempty. 0x0 for empty.
+            if n>0 & 2*fix(n/2)==n
+                % even and nonempty
+                h([1 n/2+1]) = 1;
+                h(2:n/2) = 2;
+            elseif n>0
+                % odd and nonempty
+                h(1) = 1;
+                h(2:(n+1)/2) = 2;
+            end
+            x = ifft(x.*h(:,ones(1,size(x,2))));
+
+            % Convert back to the original shape.
+            x = shiftdim(x,-nshifts);
+
+            obj.Values = angle(x);
         end
         function obj=getLowpassFiltered(obj,filterFreq)
             obj.Values=ft_preproc_lowpassfilter(...
@@ -113,67 +153,20 @@ classdef Oscillation
                 obj.Values,obj.SampleRate,filterFreqBand,[],[],[]);
         end
         function obj=getBandpassFiltered(obj,filterFreqBand)
+            obj1=obj;
+            ft_defaults;
             obj.Values=ft_preproc_bandpassfilter(...
                 obj.Values,obj.SampleRate,filterFreqBand,[],[],[]);
+            obj=neuro.basic.ChannelProcessed(obj);
+            obj.parent=obj1;
+            obj.processingInfo.BandpassFilterFreq=filterFreqBand;
         end
         function obj=getEnvelope(obj)
             obj.Values=ft_preproc_hilbert(obj.Values,'abs');
         end
-        function obj=getMedianFiltered(obj,windowInSeconds,varargin)
-            obj.Values=medfilt1(obj.Values,...
-                obj.getSampleRate*windowInSeconds,varargin{:});
-        end
-        function obj=getMeanFiltered(obj,windowInSeconds)
-            obj.Values=smoothdata(obj.Values,...
-                'movmean', obj.getSampleRate*windowInSeconds);
-        end
-        function obj=getZScored(obj)
-            obj.Values=zscore(obj.Values);
-        end
-        function vals=getValues(obj)
-            vals = obj.Values;
-            if 1~=size(vals,1)
-                vals=vals';
-            end
-        end
-        function obj=setValues(obj,va)
-            obj.Values=va;
-        end
-        function time=getSampleRate(obj)
-            time = obj.SampleRate;
-        end
-        function obj=getIdxPoints(obj,idx)
-            va = obj.Values;
-            obj.Values=va(idx);
-        end
-        function obj=setSampleRate(obj,newrate)
-            obj.SampleRate=newrate;
-        end
-        function obj=rdivide(obj,num)
-            obj=obj.setValues(obj.getValues./num);
-        end
-        function obj=plus(obj,num)
-            obj=obj.setValues(obj.getValues+num);
-        end
-        function obj=minus(obj,num)
-            obj=obj.setValues(obj.getValues-num);
-        end
-        function obj=times(obj,num)
-            obj=obj.setValues(obj.getValues.*num);
-        end
-        function idx=lt(obj,num)
-            idx=obj.getValues<num;
-        end
-        function idx=gt(obj,num)
-            idx=obj.getValues>num;
-        end
-%         function obj=subsasgn(obj,s,n)
-%             va=obj.getValues;
-%             va(s.subs{:})=n;
-%             obj=obj.setValues(va );
-%         end
         function samples=subsindex(obj,s)
-            error('This function is changed. Make sure it is working properly, then move.')
+            error(['This function is changed. Make sure it is working' ...
+                ' properly, then move.'])
             idx=s.subs{:};
             vals=obj.Values;
             if isdatetime(s)
@@ -195,7 +188,7 @@ classdef Oscillation
             warning('Obsolete. Use setValues()')
             obj.Values=va;
         end
-        
+
     end
 end
 

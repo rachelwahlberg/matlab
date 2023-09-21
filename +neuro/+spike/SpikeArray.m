@@ -1,36 +1,9 @@
 classdef SpikeArray < neuro.spike.SpikeNeuroscope
-    %SPIKEARRAY General spike analyses
-    % not static; need to create a spike array object first.
-
-    %%%%%%% Functions below: %%%%%%%%%%% 
-%     obj = SpikeArray(spikeClusters,spikeTimes)
-%     obj = getSpikeArrayWithAdjustedTimestamps(obj)
-%     print(obj,varargin)
-%     colstrings=tostring(obj,varargin)
-%     obj=setTimeIntervalCombined(obj,ticd)
-%     obj=setClusterInfo(obj,ci)
-%     tbl=getspikeIDs(obj)
-%     getMeanFireRateQuintiles(obj,nquintiles,timebininsec,order)
-%     getMeanFireRate(obj,timebin)
-%     []=plot(obj,tfm)
-%     []=plotRaster(obj)
-%     obj=getTimeInterval(obj,timeWindow)
-%     spikeUnits=getSpikeUnits(obj,idx)
-%     obj=get(obj,varargin)
-%     pbe=getPopulationBurstEvents(obj) % EMPTY!
-%     acg=getAutoCorrelogram(obj) % from neuro.spike
-%     []=saveNeuroscopeFiles(obj,folder,filename)
-%     [sa]=plus(obj,sa)
-%     [obj]=setShank(obj,shankno)
-%     [obj]=setLocation(obj,location)
-%     [obj]=sort(obj,by)
-%     st=getSpikeTimes(obj) %inherited
-%     sc=getSpikeClusters(obj) % inherited
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %SPIKEARRAY Summary of this class goes here
+    %   Detailed explanation goes here
 
     properties
-        SpikeTable
+        SpikeTableInSamples
         TimeIntervalCombined
         ClusterInfo
         Info
@@ -40,25 +13,36 @@ classdef SpikeArray < neuro.spike.SpikeNeuroscope
         function obj = SpikeArray(spikeClusters,spikeTimes)
             %SPIKEARRAY Construct an instance of this class
             %   spiketimes should be in Timestamps.
-            if ~isa(spikeClusters,'neuro.spike.SpikeArray')
-                tablearray=horzcat( spikeTimes, double(spikeClusters));
-                obj.SpikeTable=array2table(tablearray,'VariableNames',{'SpikeTimes','SpikeCluster'});
-            else
-                obj.SpikeTable=spikeClusters.SpikeTable;
-                obj.TimeIntervalCombined=spikeClusters.TimeIntervalCombined;
-                obj.ClusterInfo=spikeClusters.ClusterInfo;
-                obj.Info=spikeClusters.Info;
+            if nargin>0
+                if ~isa(spikeClusters,'neuro.spike.SpikeArray')
+                    tablearray=horzcat( spikeTimes, double(spikeClusters));
+                    obj.SpikeTableInSamples=array2table(tablearray, ...
+                        'VariableNames',{'SpikeTimes','SpikeCluster'});
+                else
+                    obj.SpikeTableInSamples=spikeClusters.SpikeTable;
+                    obj.TimeIntervalCombined=spikeClusters.TimeIntervalCombined;
+                    obj.ClusterInfo=spikeClusters.ClusterInfo;
+                    obj.Info=spikeClusters.Info;
+                end
             end
         end
 
         function obj = getSpikeArrayWithAdjustedTimestamps(obj)
             %METHOD1 Summary of this method goes here
             %   Detailed explanation goes here
-            st=obj.SpikeTable;
+            st=obj.SpikeTableInSamples;
             spiketimessample=st.SpikeTimes;
             ticd=obj.TimeIntervalCombined;
-            adjustedspiketimessample=ticd.adjustTimestampsAsIfNotInterrupted(spiketimessample);
-            obj.SpikeTable.SpikeTimes=adjustedspiketimessample;
+            adjustedspiketimessample= ...
+                ticd.adjustTimestampsAsIfNotInterrupted(spiketimessample);
+            obj.SpikeTableInSamples.SpikeTimes=adjustedspiketimessample;
+            if isa(ticd,'time.TimeIntervalCombined')
+                ti=ticd.timeIntervalList.get(1);
+            elseif isa(ticd,'time.TimeInterval')
+                ti=ticd;
+            end
+            ti.NumberOfPoints=ticd.getNumberOfPoints;
+            obj.TimeIntervalCombined=ti;
         end
         function print(obj,varargin)
             logger=logging.Logger.getLogger;
@@ -74,7 +58,11 @@ classdef SpikeArray < neuro.spike.SpikeNeuroscope
             if nargin>1
                 idx=ismember(varargin,tbl.Properties.VariableNames);
                 if ~all(idx)
-                    logger.warning([varargin{~idx} ' is not a column in the table.' strjoin(tbl.Properties.VariableNames,', ')]);
+                    logger.warning([ ...
+                        varargin{~idx} ...
+                        ' is not a column in the table.' ...
+                        strjoin(tbl.Properties.VariableNames,', ') ...
+                        ]);
                 end
                 countGroup=varargin(idx);
             else
@@ -110,12 +98,13 @@ classdef SpikeArray < neuro.spike.SpikeNeuroscope
             obj.ClusterInfo=ci;
         end
         function tbl=getspikeIDs(obj)
-            spikeIDs=unique(obj.SpikeTable.SpikeCluster);
+            spikeIDs=unique(obj.SpikeTableInSamples.SpikeCluster);
             for iid=1:numel(spikeIDs)
                 spikeid=spikeIDs(iid);
-                spikecounts(iid)=sum(obj.SpikeTable.SpikeCluster==spikeid);
+                spikecounts(iid)=sum(obj.SpikeTableInSamples.SpikeCluster==spikeid);
             end
-            tbl=array2table(horzcat(spikeIDs,spikecounts'),'VariableNames',{'ID','count'});
+            tbl=array2table(horzcat(spikeIDs,spikecounts'), ...
+                'VariableNames',{'ID','count'});
         end
         %         function fr=getMeanFireRate(obj)
         %             sus=obj.getSpikeUnits;
@@ -130,7 +119,8 @@ classdef SpikeArray < neuro.spike.SpikeNeuroscope
         %             val_m=mean(vals,1);
         %             fr=Channel('Mean Over Units',val_m,frs.getTimeInterval);
         %         end
-        function [frm, fre]=getMeanFireRateQuintiles(obj,nquintiles,timebininsec,order)
+        function [frm, fre]=getMeanFireRateQuintiles(obj,nquintiles, ...
+                timebininsec,order)
             sus=obj.getSpikeUnits;
             for isu=1:numel(sus)
                 su=sus(isu);
@@ -153,17 +143,19 @@ classdef SpikeArray < neuro.spike.SpikeNeuroscope
                 thequint=vals(idx,:);
                 themeanquint=mean(thequint,1);
                 thesterrquint=std(thequint,1)/sqrt(size(thequint,1));
-                frm{iquint}=neuro.basic.Channel(sprintf('Mean Over Units Quint, %d',iquint),...
+                frm{iquint}=neuro.basic.Channel( ...
+                    sprintf('Mean Over Units Quint, %d',iquint),...
                     themeanquint,frs.getTimeInterval);
-                fre{iquint}=neuro.basic.Channel(sprintf('Mean Over Units Quint, %d',iquint),...
+                fre{iquint}=neuro.basic.Channel( ...
+                    sprintf('Mean Over Units Quint, %d',iquint),...
                     thesterrquint,frs.getTimeInterval);
             end
         end
-        function [frm, fre]=getMeanFireRate(obj,timebin)
+        function [frm, fre]=getMeanFireRate(obj,timebinInSec)
             sus=obj.getSpikeUnits;
             for isu=1:numel(sus)
                 su=sus(isu);
-                frs=su.getFireRate(timebin);
+                frs=su.getFireRate(timebinInSec);
                 try
                     vals(isu,:)=frs.getValues;
                 catch
@@ -179,6 +171,8 @@ classdef SpikeArray < neuro.spike.SpikeNeuroscope
         end
         function frs=getFireRates(obj,timebininsec)
             sus=obj.getSpikeUnits;
+            su1=sus(1);frs=su1.getFireRate(timebininsec);
+            vals=nan(numel(sus),size(frs.getValues,2));
             for isu=1:numel(sus)
                 su=sus(isu);
                 frs=su.getFireRate(timebininsec);
@@ -187,162 +181,125 @@ classdef SpikeArray < neuro.spike.SpikeNeuroscope
                 catch
                 end
             end
+            frs=neuro.spike.FireRates(vals,[sus.Id], ...
+                frs.getTimeIntervalCombined);
+            frs.Info.TimebinInSec=timebininsec;
+            frs.ClusterInfo=obj.ClusterInfo;
+        end
+        function frs=getFireRatesZScored(obj,timebininsec)
+            sus=obj.getSpikeUnits;
+            su1=sus(1);frs=su1.getFireRate(timebininsec);
+            vals=nan(numel(sus),size(frs.getValues,2));
+            for isu=1:numel(sus)
+                su=sus(isu);
+                frs=su.getFireRate(timebininsec);
+                try
+                    vals(isu,:)=zscore(frs.getValues,0,2);
+                catch
+                end
+            end
             frs=neuro.spike.FireRates(vals,[sus.Id],frs.getTimeIntervalCombined);
             frs.Info.TimebinInSec=timebininsec;
             frs.ClusterInfo=obj.ClusterInfo;
         end
-        function []=plot(obj,tfm)
-
-            angles1=angle(tfm.matrix);
-            t=tfm.timeIntervalCombined.getTimePointsInAbsoluteTimes;
-            spiketablet=obj.SpikeTable;
-            ticd=obj.TimeIntervalCombined;
-            clustinfo=obj.ClusterInfo;
-            st=spiketablet.SpikeTimes;
-            sc=spiketablet.SpikeCluster;
-            figurename=sprintf('Rasterplot %s-%s',ticd.getRealTimeFor(st([1 end])));
-            try close(figurename);catch,end
-            figure('Name',figurename, 'Units','normalized','Position',[0 0 .2 .3])
-            clustinfo1=clustinfo;
-            locations=unique(clustinfo1.location);
-            colors=linspecer(numel(locations),'qualitative');
-            phasemap(8);
-            color=phasemap(8);
-            for iunit=1:height(clustinfo1)
-                unit=clustinfo1(iunit,:);
-                idx=ismember(sc,unit.id);
-                stn=st(idx);
-                if ~isempty(stn)
-                    arr=ticd.getRealTimeFor(stn);
-                    clear c
-                    for ipoint=1:numel(arr)
-                        pnt=arr(ipoint);
-                        idx=find(t<pnt,1,'last');
-                        angle1=angles1(idx);
-                        idx_color=round((angle1+pi)/2/pi*(size(color,1)-1))+1;
-                        c(ipoint,:)=color(idx_color,:);
-                    end
-                    hold on
-                    idx_location=ismember(locations,unit.location);
-                    s=scatter(arr,ones(size(arr))*iunit,ones(size(arr))*30,c,'|');
-                    s.LineWidth=4;
-                    s.MarkerEdgeAlpha=.8;
-                    %                     p1=plot(arr,iunit...
-                    %                         ,'Marker','|'...
-                    %                         ,'LineWidth',2 ...
-                    %                         ,'Color',colors(idx_location,:)...
-                    %                         ,'MarkerSize',3,...
-                    %                         'MarkerEdgeColor',colors(idx_location,:));
-                    %                 s1=scatter(arr,ones(size(arr))*iunit,20,[0 0 0],'filled');
-                    %                 s1.MarkerEdgeAlpha=.1;
-                    %                 s1.MarkerFaceAlpha=.1;
+        function frs=getFireRatesZScoredRaw(obj,timebininsec)
+            sus=obj.getSpikeUnits;
+            su1=sus(1);
+            sur1=neuro.spike.SpikeUnitRaw(su1.Id,su1.Times);
+            sur1.Info=su1.Info;
+            sur1.NumberOfSamples=su1.NumberOfSamples;
+            sur1.SampleRate=su1.SampleRate;
+            frs1=sur1.getFireRate(timebininsec);
+            vals=nan(numel(sus),size(frs1.getValues,2));
+            for isu=1:numel(sus)
+                su=sus(isu);
+                sur=neuro.spike.SpikeUnitRaw(su.Id,su.Times);
+                sur.Info=su.Info;
+                sur.NumberOfSamples=su.NumberOfSamples;
+                sur.SampleRate=su.SampleRate;
+                frs1=sur.getFireRate(timebininsec);
+                try
+                    vals(isu,:)=zscore(frs1.getValues,0,2);
+                catch
                 end
             end
-            ax=gca;
-            ax.YDir='reverse';
-            ax.YTick=2:5:height(clustinfo1);
-            ax.YTickLabel=clustinfo1.sh(ax.YTick);
-            locs = find(diff(sign(angles1))>0);
-            %             [~,locs]=findpeaks(angles1);
-            t1=t(locs);
-            for iline=1:numel(locs)
-                xline(t1(iline));
-            end
-            phasebar('size',.15,'location','southeast');
-        end
-        function []=getRaster(obj,group,types) %group is which table row to sort by
-            % GET raster here, plot it elsewhere (as subplot, or solo in plotRaster)
-
-            spiketablet=obj.SpikeTable;
-
-            clustinfo=obj.ClusterInfo;
-            sortby = table2cell(clustinfo(:,group));
-            sortby = string(sortby(:));
-
-            if isempty(types) %hich types to use
-            [types,~,gr]=unique(sortby); %'sh'
-            end
-
-            ticd=obj.TimeIntervalCombined;
-            st=spiketablet.SpikeTimes;
-            sc=spiketablet.SpikeCluster;
-            colors=linspecer(numel(types),'qualitative');
-
-            for ity=1:length(types)
-                clustinfo1=clustinfo(gr == ity,:);  % just selecting for the units of that type
-
-                t = string(ticd.getRealTimeFor(st([1 end])));
-                figurename = strcat("Rasterplot_type",types(1), '_', t(1), "-", t(2));
-                try close(figurename);catch,end
-                figure('Name',figurename, 'Units','normalized','Position',[0 0 .2 .3])
-                for iunit=1:height(clustinfo1)
-                    unit=clustinfo1(iunit,:);
-                    idx = ismember(sc,unit.id);
-                    stn=st(idx);
-                    if ~isempty(stn)
-                        arr=ticd.getRealTimeFor(stn);
-                        hold on
-                       % idx_location=ismember(locations,unit.sh);
-                        p1=plot(arr,iunit...
-                            ,'Marker','|'...
-                            ,'LineWidth',2 ...
-                            ,'Color',colors(ity,:)...
-                            ,'MarkerSize',3,...
-                            'MarkerEdgeColor',colors(ity,:));
-                        s1.MarkerEdgeAlpha=.1;
-                        s1.MarkerFaceAlpha=.1;
-                    end
-                    iunit
+            frs=neuro.spike.FireRatesRaw(vals,[sus.Id]);
+            frs.Info.TimebinInSec=timebininsec;
+            frs.ClusterInfo=obj.ClusterInfo;
+            frs.SampleRate=frs1.SampleRate;
+        end        
+        function tsz=getFireRatesMeanZScoredRaw(obj,timebininsec)
+            sus=obj.getSpikeUnits;
+            sumdata=[];
+            f = waitbar(0, 'Starting');
+            for isu=1:numel(sus)
+                su=sus(isu);
+                sur=neuro.spike.SpikeUnitRaw(su.Id,su.Times);
+                sur.Info=su.Info;
+                sur.NumberOfSamples=su.NumberOfSamples;
+                sur.SampleRate=su.SampleRate;
+                frs1=sur.getFireRate(timebininsec);
+                
+                if isempty(sumdata)
+                    sumdata=zscore(frs1.getValues,0,2);
+                else
+                    sumdata=sumdata+zscore(frs1.getValues,0,2);
                 end
-                ax=gca;
-                ax.YDir='reverse';
-                ax.YTick=2:5:height(clustinfo1);
-                ax.YTickLabel=clustinfo1.sh(ax.YTick);
-                ax.Title.String = figurename;
-
-                if(figpath)
-                saveas(ax,strcat(figpath,figurename, ".fig"));
-                saveas(ax,strcat(figpath,figurename, ".pdf"));
-                disp(strcat('Saved: ', figurename));
-                end
-                close(ax.Parent.Name);
+                waitbar(isu/numel(sus), f, sprintf('Progress: %d %%', ...
+                    floor(isu/numel(sus)*100)));
+                pause(0.1);
             end
+            close(f);
+            meanData=sumdata/numel(sus);
+            tsz=neuro.basic.TimeSeriesZScored(meanData,frs1.SampleRate);
         end
-
-        function [] = plotRaster(obj,group,types,figpath)
-
-
-
-        end
-
-
         function obj=getTimeInterval(obj,timeWindow)
-            if isdatetime(timeWindow)
-                s=obj.TimeIntervalCombined.getSampleForClosest(timeWindow);
-            elseif isduration(timeWindow)
-                s=obj.TimeIntervalCombined.getSampleForClosest(obj.TimeIntervalCombined.getDate+timeWindow);
+            tbl=obj.SpikeTableInSamples;
+            idx=false([height(tbl) 1]);
+            for i=1:size(timeWindow,1)
+                if isdatetime(timeWindow)
+                    s=obj.TimeIntervalCombined.getSampleForClosest(timeWindow);
+                elseif isduration(timeWindow)
+                    s=obj.TimeIntervalCombined.getSampleForClosest( ...
+                        obj.TimeIntervalCombined.getDate+timeWindow);
+                elseif strcmpi(class(timeWindow),'time.ZeitgeberTime')
+                    s=obj.TimeIntervalCombined.getSampleForClosest( ...
+                        timeWindow.getAbsoluteTime);
+                end
+                idx=idx|(tbl.SpikeTimes>=s(i,1))&(tbl.SpikeTimes<s(i,2));
             end
-            tbl=obj.SpikeTable;
-            tbl((tbl.SpikeTimes<s(1))|(tbl.SpikeTimes>=s(2)),:)=[];
-            tbl.SpikeTimes=tbl.SpikeTimes-s(1);
-            obj.SpikeTable=tbl;
+            tbl(~idx,:)=[];
+            tbl.SpikeTimes=tbl.SpikeTimes-uint64(s(1,1));
+            obj.SpikeTableInSamples=tbl;
             obj.Info.TimeFrame=timeWindow;
-            obj.TimeIntervalCombined=obj.TimeIntervalCombined.getTimeIntervalForTimes(timeWindow);
+            obj.TimeIntervalCombined=...
+                obj.TimeIntervalCombined.getTimeIntervalForSamples(...
+                s);
         end
-        function spikeUnits=getSpikeUnits(obj,idx)
-            tbl=obj.SpikeTable;
+        function spikeUnits=getSpikeUnits(obj,idx) %have to pass in as [a b ...] index, can't do a class name
+            tbl=obj.SpikeTableInSamples;
             ci=obj.ClusterInfo;
             if exist('idx','var') && ~isempty(idx)
                 ci_sub=ci(idx,:);
             else
-                ci_sub=ci;
+                ci_sub=ci; %grabs all, sorts
             end
             for isid=1:height(ci_sub)
                 aci=ci_sub(isid,:);
                 spktimes=tbl.SpikeTimes(tbl.SpikeCluster==aci.id);
-                spikeUnits(isid)=neuro.placecells.SpikeUnit(aci.id,spktimes,obj.TimeIntervalCombined);
-                spikeUnits(isid)=spikeUnits(isid).setInfo(aci);
+                spktimes = table(spktimes,'VariableNames',{'SpikeTimes'});
+                su=neuro.spike.SpikeUnit(aci.id,spktimes, ...
+                    obj.TimeIntervalCombined);
+                su=su.setInfo(aci);
+                spikeUnits(isid)=su;
             end
+        end
+        function obj=keepUnits(obj,idx)
+            tbl=obj.SpikeTableInSamples;
+            ci=obj.ClusterInfo;
+            tbl2=tbl(ismember(tbl.SpikeCluster,ci.id(idx)'),:);
+            obj.SpikeTableInSamples=tbl2;
+            obj.ClusterInfo=ci(idx,:);
         end
         function obj=get(obj,varargin)
             selected=true(height(obj.ClusterInfo),1);
@@ -358,15 +315,16 @@ classdef SpikeArray < neuro.spike.SpikeNeuroscope
                     for iint=1:numel(stringinterest)
                         interest=stringinterest{iint};
                         if any(ismember(cluinf.(interest),arg))
-                            selected_arg=selected_arg|ismember(cluinf.(interest),arg);
+                            selected_arg=selected_arg|ismember( ...
+                                cluinf.(interest),arg);
                         end
                     end
                 end
                 selected=selected&selected_arg;
             end
-            tbl=obj.SpikeTable;
+            tbl=obj.SpikeTableInSamples;
             obj.ClusterInfo=obj.ClusterInfo(selected,:);
-            obj.SpikeTable=tbl(ismember(tbl.SpikeCluster,obj.ClusterInfo.id),:);
+            obj.SpikeTableInSamples=tbl(ismember(tbl.SpikeCluster,obj.ClusterInfo.id),:);
         end
         function pbe=getPopulationBurstEvents(obj)
 
@@ -385,13 +343,23 @@ classdef SpikeArray < neuro.spike.SpikeNeuroscope
             obj.saveCluFile(fullfile(folder,[filename  '.clu.0']));
             obj.saveResFile(fullfile(folder,[filename  '.res.0']));
         end
-        function [sa]=plus(obj,sa)
+        function [ret]=plus(obj,spikeArrayOrPosition)
+            if isa(spikeArrayOrPosition,'neuro.spike.SpikeArray')
             shift=max(obj.ClusterInfo.id);
+            sa=spikeArrayOrPosition;
             sa.ClusterInfo.id=sa.ClusterInfo.id+shift;
             sa.SpikeTable.SpikeCluster=sa.SpikeTable.SpikeCluster+shift;
-            sa.ClusterInfo=sortrows([obj.ClusterInfo; sa.ClusterInfo],{'group','sh','ch'});
-
-            sa.SpikeTable=sortrows([obj.SpikeTable; sa.SpikeTable],{'SpikeTimes'});
+            sa.ClusterInfo=sortrows([obj.ClusterInfo; sa.ClusterInfo], ...
+                {'group','sh','ch'});
+            sa.SpikeTable=sortrows([obj.SpikeTableInSamples; sa.SpikeTable], ...
+                {'SpikeTimes'});
+            ret=sa;
+            elseif isa(spikeArrayOrPosition,'position.PositionData')||...
+                    isa(spikeArrayOrPosition,'position.PositionData1D')||...
+                    isa(spikeArrayOrPosition,'position.PositionDataManifold')||...
+                    isa(spikeArrayOrPosition,'position.PositionDataTimeLoaded')
+                ret=neuro.spike.SpikeArrayTrack(obj,spikeArrayOrPosition);
+            end
         end
         function [obj]=setShank(obj,shankno)
             obj.ClusterInfo.sh=ones(height(obj.ClusterInfo),1)*shankno;
@@ -404,20 +372,19 @@ classdef SpikeArray < neuro.spike.SpikeNeuroscope
             %by={'group','sh','ch'}
             obj.ClusterInfo=sortrows(obj.ClusterInfo,by);
         end
-
-        function st = getUnitSpikeTimes(obj,id) % pull st for one unit
-            st = table('SpikeTimes');
-            idx = find(obj.SpikeTable.SpikeCluster == id);
-            st = obj.SpikeTable.SpikeTimes(idx);
-        end
-
     end
     methods %inherited
-        function st=getSpikeTimes(obj) 
-            st=obj.SpikeTable.SpikeTimes;
+        function st=getSpikeTimes(obj)
+            st=obj.SpikeTableInSamples.SpikeTimes;
+        end
+        function st=getSpikeTimesZT(obj)
+            ts=obj.getSpikeArrayWithAdjustedTimestamps;
+            st1=seconds(double(ts.getSpikeTimes)/ ...
+                ts.TimeIntervalCombined.getSampleRate); 
+            st=obj.TimeIntervalCombined.getStartTimeZT+st1;
         end
         function sc=getSpikeClusters(obj)
-            sc=obj.SpikeTable.SpikeCluster;
+            sc=obj.SpikeTableInSamples.SpikeCluster;
         end
     end
 end

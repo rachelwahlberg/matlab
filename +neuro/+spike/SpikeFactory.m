@@ -32,7 +32,7 @@ classdef SpikeFactory
     methods
         function [sa,foldername]= getPhyOutputFolder(obj,foldername)
             logger=logging.Logger.getLogger; % creates logger object for logging messages
-            import neuro.time.* % allows you to not have to type neuro.time. every time
+            import time.* % allows you to not have to type neuro.time. every time
             import neuro.spike.*
             defaultloc='/data/EphysAnalysis/cluster';
             title='Select folder for spike data';
@@ -42,7 +42,7 @@ classdef SpikeFactory
                 foldername = uigetdir(defaultloc,title);
             end
 
-            theFile=dir(fullfile(foldername,['*1250Hz.TimeIntervalCombined*' '.csv'])); %TIC file gives timing info for each pre-merge file
+            theFile=dir(fullfile(foldername,['*TimeIntervalCombined*' '.csv'])); %TIC file gives timing info for each pre-merge file
             %theFile=dir(fullfile(foldername,'..',['*TimeIntervalCombined*' '.csv']));
             if isempty(theFile)
                 theFile=dir(fullfile(foldername,'..','..',['*TimeIntervalCombined*' '.csv']));
@@ -53,6 +53,8 @@ classdef SpikeFactory
                 end
             end
             ticd=TimeIntervalCombined(fullfile(theFile.folder, theFile.name)); % from the neuro.time folder
+            ticd = ticd.setZeitgeberTime(hours(12)); % for noon start, dark to light transition
+
             logger.info(['time is loaded.' ticd.tostring])
            
             try
@@ -146,7 +148,7 @@ classdef SpikeFactory
             % Import the data
             clustergroup = readtable(filepath, opts);
         end
-        function clustergroup=getTSVCluster(filepath)
+        function clustergroup=getTSVCluster(filepath) %importing cluster_info.tsv
             %% Setup the Import Options and import the data
             opts = delimitedTextImportOptions("NumVariables", 9);
             
@@ -155,9 +157,9 @@ classdef SpikeFactory
             opts.Delimiter = "\t";
             
             % Specify column names and types - sh is the classification
-            % given in phy (q)
-            opts.VariableNames = {'id','amp','ch','depth','fr','group','n_spikes','purity','sh'};
-            opts.VariableTypes = {'double','double','double','double','double', 'categorical','double','double','double'};
+            %  q in phy = class here. for the cell classification
+            opts.VariableNames = {'id','amp','ch','depth','fr','group','n_spikes','purity','class','sh'};
+            opts.VariableTypes = {'double','double','double','double','double', 'categorical','double','double','double','double'};
             
             % Specify file level properties
             opts.ExtraColumnsRule = "ignore";

@@ -21,6 +21,29 @@ classdef SessionFactory
             l.info('Session List: %s \n\t%s', file1, strjoin(T.Properties.VariableNames,', '))
             obj.SessionsFile=T;
         end
+
+        function [] = addSession(obj,basepath,sessionfilename) 
+            % ENDED UP DECIDING OVERALL MANUAL WAS EASIER. 
+            % this code is functional as an example but incomplete for
+            % actually filling the session information
+
+            sessionDate = str2double(extractAfter(basepath,'_'));
+            dateIdx = find(yyyymmdd(obj.SessionsFile.date)==sessionDate);
+            
+            if ~isnan(obj.SessionsFile.Filepath)
+                disp(['Session ' num2str(sessionDate) ' already added'])
+                return
+            else
+                
+                file1=sessionfilename;
+            T=readtable(file1,'Delimiter',',');
+             T.Filepath(1) = 1;
+            writetable(T,file1,'Delimiter',',');
+            end
+
+        end
+
+
         function sessions = getSessions(obj,varargin)
             %METHOD1 Summary of this method goes here
             %   Detailed explanation goes here
