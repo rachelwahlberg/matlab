@@ -1,0 +1,40 @@
+function [goodindex,abovethresh_spksBinned,belowthresh_spksBinned] = velocityfilter_2D(xyt,thresh,spikesBinned)
+%must be AT LEAST the threshold - eliminates slower values
+
+%take the differential of x values and then y values to determine points
+%for which speed is below the provided threshold
+
+timeDiffSeconds = diff(xyt(:,3));
+medianTimeDiff = median(timeDiffSeconds);
+timeDiffSeconds2=[timeDiffSeconds; medianTimeDiff];
+squaredDiffs = zeros(length(xyt),2);
+squaredDiffs(1:(end-1),1)= diff(xyt(:,1)).^2;
+squaredDiffs(1:(end-1),2)= diff(xyt(:,2)).^2;
+speeds = sqrt(sum(squaredDiffs, 2))./timeDiffSeconds2;
+velocity = speeds/medianTimeDiff;
+ 
+%for position bins that are above or below the thresh
+badindex = find(velocity<thresh);
+goodindex = velocity>thresh; %bad index is just the 0s
+
+
+if exist("spikesBinned","var") %get out spike bins that are above velocity or below
+
+    belowthresh_spksBinned = zeros(size(spikesBinned));
+    belowthresh_spksBinned(~goodindex) = spikesBinned(badindex); %the below %~goodindex was badindex before
+
+    spikesBinned(badindex)=0;
+
+    if badindex(end) == length(spikesBinned) %so you're not making a larger vec
+        spikesBinned(end) = 0;
+        badindex = badindex(1:end-1); %get rid of last badindex
+    end
+
+    spikesBinned(badindex+1)=0; % just to be safe
+
+    abovethresh_spksBinned = spikesBinned; %this is what we want in the end
+    %
+end
+
+
+end

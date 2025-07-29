@@ -1,0 +1,278 @@
+function  [placemapAll,spikemapAll,timeSpentAll,placemapClock,...
+    spikemapClock,timeSpentClock,placemapCounter,spikemapCounter, timeSpentCounter] = 
+%%%%% uses PFClassic: %%%%%%%
+%pos is nx2 array, NORMALIZED between 0 and 100.
+%spksBinned gives the number of spikes in each epoch.
+%Smooth is width of gaussian smoother (in 0 ... 1 units)
+% nGrid gives grid spacing (should be larger than 1/smooth)
+
+import position.* %otherwise when I call position.getDirectionsIdx it's calling a different position func?
+
+%%%%%% default vals %%%%%%%%
+timeWindow = [obj.positionData.time.getStartTimeAbs obj.positionData.time.getEndTimeAbs];
+smoothVal = .02; %out of 100
+nGrid = [100 100]; %one val for each dimension + for time
+timebinsize = .01;% tbins in units of seconds, e.g. 10 ms.
+
+%%%%%%%%% time %%%%%%%%%%%%%%%%
+positionTimeZT = obj.positionData.time.getTimePointsZT;
+
+%%%%%%%% Normalize position  %%%%%%%%%%%%%%
+x = obj.positionData.data.X;
+z = obj.positionData.data.Z;
+x = x - min(x); %make all values positive, aligned to zero
+z = z - min(z);
+%
+normX = x/max(x); %normalize to make all vals between 0 and 1.
+normZ = z/max(z);
+
+%obj.positionData = obj.positionData.normalizePositionData;
+%%%%%%%%% filter by... PART 1 %%%%%%%%%%%
+
+
+%%% First half/ second half
+half = 'Both'; %'First' 'Second'
+%[positionTimeZT,normX,normZ] = filterbyhalf(positionTimeZT,normX,normZ,half);
+
+%Get binned position %%%%%%%%%%%
+tbegin = positionTimeZT(1); tend = positionTimeZT(end);
+nBins = round(seconds(tend-tbegin)/timebinsize);
+xzt(:,1) = normX;
+xzt(:,2) = normZ;
+xzt(:,3) = seconds(positionTimeZT);
+
+positionBinned = external.Placefields.binpos(xzt,nBins);
+histedges = positionBinned(:,3)-timebinsize;
+histedges(end+1) = histedges(end)+timebinsize;
+
+%%%%%%%%% filter by... PART 2 %%%%%%%%%%%
+
+%%% Clockwise + Counterclockwise indices
+%[clockwiseIdx,counterIdx] = getDirectionsIdx(obj.Events.Turns);
+
+%%%% get angle
+[Turns,angle] = directionsCircularTrackRadians(obj.positionData);
+at = [angle xzt(:,3)];
+angleBinned=external.Placefields.binAngle(at,nBins); %binned at same rate as binnedPosition
+
+%%% theta
+%  belowthreshtheta = filterbytheta();
+
+%%%%%% spiking info %%%%%%%%%%
+sf = neuro.spike.SpikeFactory.instance(); %Spike Factory (Kaya code)
+sa = sf.getPhyOutputFolder(obj.phypath); %Spike Array (Kaya code)
+su = sa.getSpikeUnits; % pull spiketimes per unit.
+nUnits = length(su);
+
+try
+    classTypes = unique(sa.ClusterInfo.class);
+catch
+    classTypes = 1;
+end
+
+nclassTypes = length(classTypes);
+
+%%%%%% for each unit, plot place field %%%%%%%
+
+if plotfigures == 1
+    figure
+    grid_height = 3; grid_width = 5;
+end
+
+for c = 1:nclassTypes
+    class = classTypes(c);
+    for unit = 1:nUnits
+
+        %%%%%% get spikeCount %%%%%%%%
+        % spsBinned is binned with same bins as binnedPos above
+
+        spksZT = seconds(su(unit).getTimesZT)';  %spikes in ZT time.
+
+        spksBinned = histcounts(spksZT,histedges)'; %still applies to linear
+        spksBinned(end)=0; spksBinned(1)=0; % find number of spikes per unit time.
+
+        [spksAngle,spksT] = getSpksAngle(spksBinned,positionBinned); %for polar plot
+
+        %%%%%%%%% % velocityfilter = external.velocityfilter(binnedPos)
+        velocityThresh = 10; %in 10 cm/hour
+        [~,~,spksBinned] = velocityfilter_2D(positionBinned,velocityThresh,spksBinned); %in cm/s (in +position folder)
+
+        spkslogical = logical(spksBinned);
+        xpostvelocityfilter = positionBinned(spkslogical,1)*100;
+        zpostvelocityfilter = positionBinned(spkslogical,2)*100;
+
+        %%%%%% clockwise and counterclockwise vals %%%%%%
+
+        [~,spksBinnedcl,spksBinnedco] = counterClockwise_positionBinned(positionBinned,obj.Events.Turns,spksBinned);
+        spksBinnedcl = spksBinnedcl .* spkslogical;
+        spksBinnedco = spksBinnedco .* spkslogical;
+
+        clocklogical = logical(spksBinnedcl); % > 10cm/s and clockwise
+        counterlogical = logical(spksBinnedco); % > 10cm/s and counterclockwise
+
+        xclockwise = positionBinned(clocklogical,1)*100;
+        zclockwise = positionBinned(clocklogical,2)*100;
+
+        xcounter = positionBinned(counterlogical,1)*100;
+        zcounter = positionBinned(counterlogical,2)*100;
+
+        [spksAngleCl,spksTCl] = getSpksAngle(spksBinnedcl,positionBinned);
+        [spksAngleCl,spksTCl] = getSpksAngle(spksBinnedcl,positionBinned);
+
+        allBins = ones(length(positionBinned),1);
+        allAngles = getSpksAngle(allBins,positionBinned);
+        plotplacemap = 0;
+        [placemapAll, spikemapAll, timeSpentAll] = neuro.placeField.PFClassic1D_RW(allAngles,spksBinned,smoothVal,100,timebinsize,plotplacemap);
+        peak = neuro.placeField.getPlacefieldPeakCircular(placemapAll);
+
+        [placemapClock, spikemapClock, timeSpentClock] = neuro.placeField.PFClassic1D_RW(allAngles,spksBinned,smoothVal,100,timebinsize,plotplacemap);
+        peak = neuro.placeField.getPlacefieldPeakCircular(placemapClock);
+
+        [placemapCounter, spikemapCounter, timeSpentCounter] = neuro.placeField.PFClassic1D_RW(allAngles,spksBinned,smoothVal,100,timebinsize,plotplacemap);
+        peak = neuro.placeField.getPlacefieldPeakCircular(placemapCounter);
+
+        %%%%%%%%% create tiles %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        if plotfigures == 1
+            plotFigures
+        end
+
+    end
+end
+
+
+
+
+
+            function plotFigures
+
+        h1 = tiledlayout(grid_height,grid_width);
+        title(h1,['Unit ' num2str(unit)]);
+
+        position = 1; h = 1; w = 1; ax1 = nexttile(position,[h,w]);
+        position = 2; h = 1; w = 1; ax2 = nexttile(position,[h,w]);
+        position = 3; h = 1; w = 1; ax3 = nexttile(position,[h,w]);
+        position = 4; h = 1; w = 1; ax4 = nexttile(position,[h,w]);
+        position = 5; h = 1; w = 1; ax5 = nexttile(position,[h,w]);
+        position = 6; h = 1; w = 1; ax6 = nexttile(position,[h,w]);
+        position = 7; h = 1; w = 1; ax7 = nexttile(position,[h,w]);
+        position = 8; h = 1; w = 1; ax8 = nexttile(position,[h,w]);
+        position = 9; h = 1; w = 1; ax9 = nexttile(position,[h,w]);
+        position = 10; h = 1; w = 1; ax10 = nexttile(position,[h,w]);
+        position = 11; h = 1; w = 1; ax11 = nexttile(position,[h,w]);
+        position = 12; h = 1; w = 1; ax12 = nexttile(position,[h,w]);
+        position = 13; h = 1; w = 1; ax13 = nexttile(position,[h,w]);
+        position = 14; h = 1; w = 1; ax14 = nexttile(position,[h,w]);
+        position = 15; h = 1; w = 1; ax15 = nexttile(position,[h,w]);
+
+        %%%%%%%%%%%%%%%%% both directions %%%%%%%%%%%%%%%%%
+        % plots position data and locations of unit firing
+        axes(ax1)
+        plottitle = 'Spk locs. (> 10 cm velocities)';
+        plot.plotPlaceFields('spkLocations',plottitle,x,z,xpostvelocityfilter,zpostvelocityfilter)
+
+        %
+        axes(ax2)
+       % title('All segments')
+        polarplot(angleBinned,positionBinned(:,3));
+        hold on
+        polarplot(spksAngle,spksT,'.k')
+        polarplot(Turns.LocationInRadians(Turns.Direction == 1),Turns.TimestampZT(Turns.Direction == 1),'*r')
+        polarplot(Turns.LocationInRadians(Turns.Direction == 0),Turns.TimestampZT(Turns.Direction == 0),'*g')
+        ax = gca;
+        ax.ThetaAxisUnits = "radians";
+
+        % Plots occupancy and firing rate map
+        axes(ax5)
+        hold on
+        %Get and plot place field %%%%%%%
+        [~,~,nSpikes,sTimeSpent,snSpikes] = ...
+            external.Placefields.PFClassic(positionBinned(:,1:2),spksBinned,smoothVal,nGrid,timebinsize);
+        title(['Place map, nspikes = ' num2str(sum(sum(nSpikes)))])
+
+        %
+        axes(ax3)
+        plottitle = 'Smoothed Occ. map';
+        plot.plotPlaceFields('imagescMap',plottitle,sTimeSpent)
+
+        %
+        axes(ax4)
+        plottitle = 'Smoothed Spikemap';
+        plot.plotPlaceFields('imagescMap',plottitle,snSpikes)
+
+        %%%%%%%%%%%%%%%%% clockwise %%%%%%%%%%%%%%%%%
+        % AX2: plots position data and locations of unit firing
+        axes(ax6)
+        plottitle = 'Spk locs. clockwise';
+        plot.plotPlaceFields('spkLocations',plottitle,x,z,xclockwise,zclockwise)
+
+        axes(ax7)
+        % title('All segments')
+        polarplot(angleBinned,positionBinned(:,3));
+        hold on
+        polarplot(spksAngleCl,spksTCl,'.k')
+        polarplot(Turns.LocationInRadians(Turns.Direction == 1),Turns.TimestampZT(Turns.Direction == 1),'*r')
+        polarplot(Turns.LocationInRadians(Turns.Direction == 0),Turns.TimestampZT(Turns.Direction == 0),'*g')
+        ax = gca;
+        ax.ThetaAxisUnits = "radians";
+
+        % AX3: Plots occupancy and firing rate map
+        axes(ax10)
+        hold on
+        %Get and plot place field %%%%%%%
+        [~,~,nSpikes,sTimeSpent,snSpikes] = ...
+            external.Placefields.PFClassic(positionBinned(:,1:2),spksBinnedcl,smoothVal,nGrid,timebinsize);
+        title(['Clockwise place map, nspikes = ' num2str(sum(sum(nSpikes)))])
+
+        % AX4:
+        axes(ax8)
+        plottitle = 'Smoothed Occ. clockwise';
+        plot.plotPlaceFields('imagescMap',plottitle,sTimeSpent)
+
+        % AX5:
+        axes(ax9)
+        plottitle = 'Smoothed Spikes clockwise';
+        plot.plotPlaceFields('imagescMap',plottitle,snSpikes)
+
+        %%%%%%%%%%%%%%%%% counterclockwise %%%%%%%%%%%%%%%%%
+
+        % AX2: plots position data and locations of unit firing
+        axes(ax11)
+        plottitle = 'Spk locs. counter';
+        plot.plotPlaceFields('spkLocations',plottitle,x,z,xcounter,zcounter)
+
+        axes(ax12)
+        % title('All segments')
+        polarplot(angleBinned,positionBinned(:,3));
+        hold on
+        polarplot(spksAngleCl,spksTCl,'.k')
+        polarplot(Turns.LocationInRadians(Turns.Direction == 1),Turns.TimestampZT(Turns.Direction == 1),'*r')
+        polarplot(Turns.LocationInRadians(Turns.Direction == 0),Turns.TimestampZT(Turns.Direction == 0),'*g')
+        ax = gca;
+        ax.ThetaAxisUnits = "radians";
+
+        % AX3: Plots occupancy and firing rate map
+        axes(ax15)
+        hold on
+        %Get and plot place field %%%%%%%
+        [~,~,nSpikes,sTimeSpent,snSpikes] = ...
+            external.Placefields.PFClassic(positionBinned(:,1:2),spksBinnedco,smoothVal,nGrid,timebinsize);
+        title(['Counter place map, nspikes = ' num2str(sum(sum(nSpikes)))])
+
+        % AX4:
+        axes(ax13)
+        plottitle = 'Smoothed Occ. counter';
+        plot.plotPlaceFields('imagescMap',plottitle,sTimeSpent)
+
+        % AX5:
+        axes(ax14)
+        plottitle = 'Smoothed Spikes counter';
+        plot.plotPlaceFields('imagescMap',plottitle,snSpikes)
+
+        figure %separate figure cause of zoom factor
+        plotplacemap = 1;
+        external.Placefields.PFClassic1D(allAngles,spksBinned,smoothVal,100,timebinsize,plotplacemap);
+
+        pause
+        clf
+           
+       end

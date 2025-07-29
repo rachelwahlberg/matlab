@@ -2,7 +2,7 @@ classdef TimeInterval < time.TimeIntervalAbstract
     %TimeInterval Represents a time interval and provides methods for working with it
 
     properties
-        StartTime   % Start time of the interval
+        startTime   % Start time of the interval
         SampleRate  % Sampling rate of the interval
         NumberOfPoints % Number of data points in the interval
     end
@@ -11,8 +11,8 @@ classdef TimeInterval < time.TimeIntervalAbstract
             % Constructor method that initializes the TimeInterval object
             % with the specified start time, sampling rate, and number of data points.
             obj.SampleRate = sampleRate;
-            obj.StartTime=startTime;
-            obj.StartTime.Format='uuuu-MM-dd HH:mm:ss.SSS';
+            obj.startTime=startTime;
+            obj.startTime.Format='uuuu-MM-dd HH:mm:ss.SSS';
             obj.NumberOfPoints=numberOfPoints;
             obj.Format = 'HH:mm:ss.SSS'; % Format of the timestamps in the interval
 
@@ -26,9 +26,9 @@ classdef TimeInterval < time.TimeIntervalAbstract
             % Tostring method that returns a string representation of the TimeInterval object.
             date = obj.getDate;
             date.Format='yyyy-MM-dd';
-            st = char(obj.getStartTime, 'HH:mm:ss.SSS');
-            en = char(obj.getEndTime, 'HH:mm:ss.SSS');
-            dur = obj.getEndTime - obj.getStartTime;
+            st = char(obj.getstartTime, 'HH:mm:ss.SSS');
+            en = char(obj.getendTime, 'HH:mm:ss.SSS');
+            dur = obj.getendTime - obj.getstartTime;
             dur1 = char(dur,"hh:mm:ss.SSS");        
             sf=obj.getSampleRate;
             np=obj.getNumberOfPoints;
@@ -40,7 +40,7 @@ classdef TimeInterval < time.TimeIntervalAbstract
         function S=getStruct(obj)
             % GetStruct method that returns a structure with the
             % SampleRate, StartTime, and NumberOfPoints properties of the TimeInterval object.
-            S.StartTime=obj.StartTime;
+            S.startTime=obj.startTime;
             S.NumberOfPoints=obj.NumberOfPoints;
             S.SampleRate=obj.SampleRate;
         end
@@ -62,7 +62,7 @@ classdef TimeInterval < time.TimeIntervalAbstract
                 newTimeInterval = [];
                 return
             elseif startSample > 0 && startSample <= obj.NumberOfPoints
-                obj.StartTime = obj.getRealTimeFor(startSample);
+                obj.startTime = obj.getRealTimeFor(startSample);
                 if endSample <= obj.NumberOfPoints
                     obj.NumberOfPoints = endSample - startSample + 1;
                 else
@@ -105,7 +105,7 @@ classdef TimeInterval < time.TimeIntervalAbstract
                 for icol=1:size(idx,2)
                     validsamples(:,icol)=samples(idx(:,icol),icol);
                 end
-                time=obj.StartTime+seconds(double((validsamples-1))/obj.SampleRate);
+                time=obj.startTime+seconds(double((validsamples-1))/obj.SampleRate);
                 time.Format=obj.Format;
             else
                 time=[];
@@ -119,34 +119,43 @@ classdef TimeInterval < time.TimeIntervalAbstract
         function samples=getSampleFor(obj,times)
             % GetSampleFor method that returns an array of sample indices
             % that correspond to a set of datetime objects in the interval.
+            % MAKE SURE that you send in either BOTH zt or NEITHER zt (for
+            % obj.StartTime/EndTIme and times
             samples=nan(size(times));
-            startTime=obj.StartTime;
-            endTime=obj.getEndTime;
+            startTime=obj.startTime; %absolute
+            endTime=obj.getendTime; %absolute
             for i=1:numel(times)
                 time=times(i);
                 if time>=startTime && time<=endTime
-                    samples(i)=round(seconds(time-obj.StartTime)*obj.SampleRate)+1;
+                    samples(i)=round(seconds(time-obj.startTime)*obj.SampleRate); %+1;
                     if samples(i)<1
                         samples(i)=1;
                     end
                 end
             end
         end
-        function samples = getSampleForClosest(obj, datetimes)
+        function samples = getSampleForClosest(obj, datetimes,fillOutofRange)
             % GetSampleForClosest method that returns an array of sample indices
             % that correspond to a set of datetime objects in the interval,
             % where each datetime object is matched to the closest sample index in the interval.
-            datetimes = obj.getDatetime(datetimes);
+            
+            samples = nan(size(datetimes)); % set zero array
 
-            samples = nan(size(datetimes));
+            datetimes = obj.getDatetime(datetimes); %convert into ABSOLUTE datetimes
+            
+            theInterval = obj; 
 
-            theInterval = obj;
-            ends(1) = theInterval.getStartTime;
-            ends(2) = theInterval.getEndTime;
-            idx = datetimes >= theInterval.StartTime & ...
-                datetimes <= theInterval.getEndTime;
+            ends(1) = theInterval.getstartTime;
+            ends(2) = theInterval.getendTime;
+            idx = datetimes >= theInterval.startTime & ...
+                datetimes <= theInterval.getendTime; %find times within the provided interval
             samples(idx) = theInterval.getSampleFor(datetimes(idx));
 
+            %%% This will provide a value for every sample, even if out of
+            %%% range - will assign the first or last in interval depending
+            %%% on which is closer. 
+
+            if exist("fillOutofRange")
             for it = 1:numel(samples)
                 if isnan(samples(it))
                     datetime = datetimes(it);
@@ -155,6 +164,8 @@ classdef TimeInterval < time.TimeIntervalAbstract
                 end
             end
             samples = obj.getSampleFor(datetimes);
+            end
+
         end
         % A constructor method that initializes the TimeIntervalZT
         % object with the specified Zeitgeber Time.
@@ -163,16 +174,16 @@ classdef TimeInterval < time.TimeIntervalAbstract
             tiz=time.TimeIntervalZT(obj,zt);
         end
         % A method that returns the end time of the TimeInterval object
-        function time=getEndTime(obj)
+        function time=getendTime(obj)
             % Compute the end time of the TimeInterval object
-            time=obj.StartTime+seconds((obj.NumberOfPoints-1)/obj.SampleRate);
+            time=obj.startTime+seconds((obj.NumberOfPoints-1)/obj.SampleRate);
             % Set the format of the time object to the same as the start time object
             time.Format=obj.Format;
         end
         % A method that returns the end time of the TimeIntervalZT object
         function time=getEndTimeZT(obj)
             % Compute the end time of the TimeIntervalZT object
-            time1=obj.getEndTime;
+            time1=obj.getendTime;
             % Subtract the Zeitgeber Time from the computed end time to get
             % the end time in the Zeitgeber Time zone
             time=time1-obj.getZeitgeberTime;
@@ -205,15 +216,15 @@ classdef TimeInterval < time.TimeIntervalAbstract
             p1.LineWidth=5;
         end
         % A method that returns the start time of the TimeInterval object
-        function st=getStartTime(obj)
+        function st=getstartTime(obj)
             % Get the start time of the TimeInterval object
-            st=obj.StartTime;
+            st=obj.startTime;
             % Set the format of the time object to the same as the start time object
             st.Format=obj.Format;
         end
 
         function st=getStartTimeZT(obj)
-            st1=obj.StartTime;
+            st1=obj.startTime;
             zt=obj.getZeitgeberTime;
             st=st1-zt;
         end
@@ -233,7 +244,7 @@ classdef TimeInterval < time.TimeIntervalAbstract
             try
                 % Compute the time points as the sequence of equally spaced
                 % numbers from 0 to the duration of the interval
-                duration = obj.getEndTime - obj.getStartTime;
+                duration = obj.getendTime - obj.getstartTime;
                 numPoints = obj.NumberOfPoints;
                 timePoints = linspace(0, duration, numPoints);
             catch ME
@@ -244,16 +255,41 @@ classdef TimeInterval < time.TimeIntervalAbstract
             % If a reference time is specified, shift the time points by
             % the difference between the start time and the reference time
             if exist('referenceTime', 'var')
-                startTime = obj.getStartTime;
+                startTime = obj.getstartTime;
                 refTime = obj.getDatetime(referenceTime);
                 timeDifference = seconds(startTime - refTime);
                 timePoints = timePoints + timeDifference;
             end
         end
+
+        function timePoints = getTimePointsZT(obj)
+
+            try
+                % Compute the time points as the sequence of equally spaced
+                % numbers from 0 to the duration of the interval
+                duration = obj.getendTime - obj.getstartTime;
+                numPoints = obj.NumberOfPoints;
+                timePoints = linspace(0, duration, numPoints);
+            catch ME
+                % Handle any errors that occur during the computation of time points
+                error('Error computing time points: %s', ME.message);
+            end
+
+            % shift the time points by the dif between the start time and the zt time
+            try
+                startTime = obj.getstartTime;
+
+                timeDifference = seconds(startTime - obj.getZeitgeberTime);
+                timePoints = timePoints + timeDifference;
+            catch ME
+                error('Need ZT time in timeIntervalCombined: %s', ME.message);
+            end
+        end
+
         % A method that returns an array of time points for the TimeInterval
         % object in absolute times
         function tps=getTimePointsInAbsoluteTimes(obj)
-            tps=obj.getTimePoints+obj.getStartTime;
+            tps=obj.getTimePoints+obj.getstartTime;
         end
         function nop=getNumberOfPoints(obj)
             nop=obj.NumberOfPoints;
@@ -266,7 +302,7 @@ classdef TimeInterval < time.TimeIntervalAbstract
         end
         function ticd=saveTable(obj,filePath)
             % Convert relevant properties of the TimeInterval object to a struct
-            S.StartTime = datetime(obj.StartTime,'Format', ...
+            S.StartTime = datetime(obj.startTime,'Format', ...
                 'yyyy-MM-dd HH:mm:ss.SSS'); % convert to string format
             S.NumberOfPoints=obj.NumberOfPoints;
             S.SampleRate=obj.SampleRate;
@@ -282,7 +318,11 @@ classdef TimeInterval < time.TimeIntervalAbstract
             % Create a new TimeIntervalCombined object from the saved file
             ticd=time.TimeIntervalCombined(filePath);
         end        function obj=shiftTimePoints(obj,shift)
-            obj.StartTime=obj.StartTime+shift.Duration;
+            obj.startTime=obj.startTime+shift.Duration;
+        end
+        function [] = getStartTime()
+        end
+        function [] = getEndTime()
         end
 
     end

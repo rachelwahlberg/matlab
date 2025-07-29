@@ -1,0 +1,16 @@
+function peak = getPlacefieldPeakCircular(placemap)
+% for use with linearized circular track, 
+% place map normalized between 0 and 1 but corresp
+[pks,locs1]=max(placemap);
+angle=linspace(0,2*pi,length(placemap));
+locs=angle(locs1);
+
+%             X=linspace(min(obj.PositionData.data.X), ...
+%                 max(obj.PositionData.data.X), ...
+%                 size(obj.MapSmooth,2));
+%             locs=X(locs1);
+peak=table(pks',locs', ...
+    VariableNames={'FiringRate','Position'});
+
+
+end

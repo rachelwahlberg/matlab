@@ -1,0 +1,28 @@
+function [abovethresh_nspks,goodindex,belowthresh_nspks,badindex] = velocityfilterUK_2D(xyt,nspk,thresh)
+%must be AT LEAST the threshold - eliminates slower values
+
+%take the differential of x values and then y values to determine points
+%for which speed is below the provided threshold
+
+medianTimeDiff = median(timeDiffSeconds);
+timeDiffSeconds = diff(xyt(:,3));
+timeDiffSeconds2=[timeDiffSeconds; medianTimeDiff];
+squaredDiffs = zeros(length(xyt),2);
+squaredDiffs(1:(end-1),1)= diff(xyt(:,1)).^2;
+squaredDiffs(1:(end-1),2)= diff(xyt(:,2)).^2;
+speeds = sqrt(sum(squaredDiffs, 2))./timeDiffSeconds2;
+velocity = speeds/medianTimeDiff;
+ 
+badindex = find(velocity<thresh);
+goodindex = find(velocity>thresh);
+
+belowthresh_nspks = zeros(size(nspk));
+belowthresh_nspks(badindex) = nspk(badindex); %the below
+
+nspk(badindex)=0;
+
+if badindex(end) == length(nspk)
+nspk(badindex+1)=0; % just to be safe
+abovethresh_nspks = nspk; %this is what we want in the end
+% 
+

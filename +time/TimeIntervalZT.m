@@ -12,10 +12,16 @@ classdef TimeIntervalZT < time.TimeInterval
             %   Detailed explanation goes here
             if isa(varargin{1},'time.TimeInterval')
                 ti=varargin{1};
-                startTime=ti.StartTime;
+                startTime=ti.StartTimeAbs;
                 sampleRate=ti.SampleRate;
                 numberOfPoints=ti.NumberOfPoints;
                 zt=varargin{2};
+            elseif  isa(varargin{1},'time.TimeIntervalCombined')
+                ti=varargin{1};
+                startTime=ti.getStartTimeAbs;
+                sampleRate=ti.getSampleRate;
+                numberOfPoints=ti.getNumberOfPoints;
+                zt=varargin{1}.getZ
             else
                 startTime=varargin{1};
                 sampleRate=varargin{2};
@@ -51,12 +57,26 @@ classdef TimeIntervalZT < time.TimeInterval
             en=obj.getEndTimeZT;
             tps=linspace(st,en,obj.NumberOfPoints);
         end
-        function st=getStartTimeZT(obj)
-            st1=obj.StartTime;
+        function st=getStartTimeZT(obj)%gives a duration object
+            st1=obj.getStartTimeAbs;
             zt=obj.getZeitgeberTime;
             st=st1-zt;
         end
-
+        function zttimes=getZTTimeForSamples(obj,samples)
+            %same function as "getRealTimeFor" but subtracts the zt time
+            %(for example, noon, when the dark/light transition is) from
+            %the real time stamps to output zt times.
+            %             if numel(samples)>1e5
+            %                 tps=obj.getTimePointsInAbsoluteTimes;
+            %                 zttimes=tps(samples);
+            %             else
+            zt = obj.getZeitgeberTime;
+            for isample=1:numel(samples)
+                sample=samples(isample);
+                zttimes(isample) = obj.getRealTimeFor(sample)-zt;
+            end
+            %             end
+        end
     end
 end
 

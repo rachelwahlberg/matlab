@@ -1,4 +1,4 @@
-function CheckEegStates_RW(varargin) % fileinfo was a previous arg
+function gCheckEegStates = CheckEegStates(varargin) % fileinfo was a previous arg
 %function CheckEegStates(fileinfo)
 
 p = inputParser;
@@ -72,7 +72,7 @@ end
 Channels = [];
 
 % if ~isempty(fileinfo.CA1thetach)
-%     ca1 = find(fileinfo.CA==1);
+%     ca1 = find(fileinfo.CA==1); 
 % %     Channels = [Channels fileinfo.GammaCh(ca1(1))];
 %     Channels = fileinfo.CA1thetach + 1;
 % elseif ~isempty(fileinfo.CA3thetach)
@@ -152,7 +152,7 @@ nAuxData = size(AuxData,1);
 % fill the global structure for future use
 gCheckEegStates.Channels = Channels;
 gCheckEegStates.nChannels = nChannels;
-gCheckEegStates.FileBase = basename;
+gCheckEegStates.FileBase = [basename '_1250Hz'];
 gCheckEegStates.State = State;
 gCheckEegStates.t = 10; %is seconds
 gCheckEegStates.eFs = eSampleRate;

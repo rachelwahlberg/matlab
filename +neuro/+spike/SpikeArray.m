@@ -253,7 +253,7 @@ classdef SpikeArray < neuro.spike.SpikeNeuroscope
             meanData=sumdata/numel(sus);
             tsz=neuro.basic.TimeSeriesZScored(meanData,frs1.SampleRate);
         end
-        function obj=getTimeInterval(obj,timeWindow)
+        function obj=getTimeWindow(obj,timeWindow)
             tbl=obj.SpikeTableInSamples;
             idx=false([height(tbl) 1]);
             for i=1:size(timeWindow,1)
@@ -372,10 +372,11 @@ classdef SpikeArray < neuro.spike.SpikeNeuroscope
             %by={'group','sh','ch'}
             obj.ClusterInfo=sortrows(obj.ClusterInfo,by);
         end
-    end
-    methods %inherited
-        function st=getSpikeTimes(obj)
-            st=obj.SpikeTableInSamples.SpikeTimes;
+        function st = getSpikeTimesInAbsoluteTime(obj)
+            ts=obj.getSpikeArrayWithAdjustedTimestamps;
+            st1=seconds(double(ts.getSpikeTimes)/ ...
+                ts.TimeIntervalCombined.getSampleRate); 
+            st = st1 + obj.TimeIntervalCombined.getStartTimeAbs;
         end
         function st=getSpikeTimesZT(obj)
             ts=obj.getSpikeArrayWithAdjustedTimestamps;
@@ -383,6 +384,12 @@ classdef SpikeArray < neuro.spike.SpikeNeuroscope
                 ts.TimeIntervalCombined.getSampleRate); 
             st=obj.TimeIntervalCombined.getStartTimeZT+st1;
         end
+    end
+    methods %inherited
+        function st=getSpikeTimes(obj)
+            st=obj.SpikeTableInSamples.SpikeTimes;
+        end
+
         function sc=getSpikeClusters(obj)
             sc=obj.SpikeTableInSamples.SpikeCluster;
         end

@@ -115,7 +115,7 @@ classdef TimeIntervalCombined < time.TimeIntervalAbstract
             til=obj.timeIntervalList;
             for iInt=1:til.length
                 theTimeInterval(iInt)=til.get(iInt);  
-                st(iInt)=theTimeInterval(iInt).getStartTime;  
+                st(iInt)=theTimeInterval(iInt).getstartTime;  
             end
             [~,I]=sort(st);
             til.remove(1:numel(I));
@@ -127,9 +127,9 @@ classdef TimeIntervalCombined < time.TimeIntervalAbstract
             %METHOD1 Summary of this method goes here
             %   Detailed explanation goes here
             date=datestr(obj.getDate,1);
-            st=datestr( obj.getStartTime,13);
-            en=datestr(obj.getEndTime,13);
-            dur=obj.getEndTime-obj.getStartTime;
+            st=datestr( obj.getstartTime,13);
+            en=datestr(obj.getendTime,13);
+            dur=obj.getendTime-obj.getstartTime;
             dur1=datestr(dur,13);
             sf=obj.getSampleRate;
             np=obj.getNumberOfPoints;
@@ -215,11 +215,39 @@ classdef TimeIntervalCombined < time.TimeIntervalAbstract
                         end
                     end
                     time.Format=obj.Format;
-                    times(isample)=time;  
+                    times(isample)=time;
                 end
             end
         end
-        
+
+        function zttimes=getZTTimeForSamples(obj,samples)
+            %same function as "getRealTimeFor" but subtracts the zt time
+            %(for example, noon, when the dark/light transition is) from
+            %the real time stamps to output zt times.
+%             if numel(samples)>1e5
+%                 tps=obj.getTimePointsInAbsoluteTimes;
+%                 zttimes=tps(samples);
+%             else
+                 for isample=1:numel(samples)
+                    sample=samples(isample);
+                    newSample=0;
+                    til= obj.timeIntervalList; %TimeIntervalZT class
+                    for iInt=1:til.length % num of files you're using
+                        theTimeInterval=til.get(iInt); %get the one file
+                        lastSample=newSample;
+                        newSample=lastSample+theTimeInterval.NumberOfPoints;
+                        if sample>lastSample && sample<=newSample
+                            time=theTimeInterval.getRealTimeFor(double( ...
+                                sample)-lastSample); %TimeInterval class
+                        end
+                    end
+                    time = time - obj.getZeitgeberTime;
+                   % time.Format='hh:mm:ss';
+                    zttimes(isample)=time;
+                end
+%             end
+        end
+
         function samples=getSampleFor(obj,times)
             %METHOD1 Summary of this method goes here
             %   Detailed explanation goes here
@@ -229,7 +257,7 @@ classdef TimeIntervalCombined < time.TimeIntervalAbstract
                 lastSample=0;
             for iInt=1:til.length
                 theTimeInterval=til.get(iInt);
-                idx=times>=theTimeInterval.StartTime&times<=theTimeInterval.getEndTime;
+                idx=times>=theTimeInterval.startTime&times<=theTimeInterval.getendTime;
                 samples(idx)=theTimeInterval.getSampleFor(times(idx))+lastSample;
                 lastSample=lastSample+theTimeInterval.NumberOfPoints;         
             end
@@ -242,13 +270,13 @@ classdef TimeIntervalCombined < time.TimeIntervalAbstract
             samples=nan(size(times));
             til= obj.timeIntervalList;
             lastSample=0;
-            ends=datetime.empty([til.length 0]);
+            ends=datetime.empty([til.length 0]); %create empty dt array 
             for iInt=1:til.length
                 theTimeInterval=til.get(iInt);
-                ends((iInt-1)*2+1,1)=theTimeInterval.getStartTime;
-                ends(iInt*2,1)=theTimeInterval.getEndTime;
-                idx=times>theTimeInterval.getStartTime & ...
-                    times<=theTimeInterval.getEndTime;
+                ends((iInt-1)*2+1,1)=theTimeInterval.getstartTime;
+                ends(iInt*2,1)=theTimeInterval.getendTime;
+                idx=times>theTimeInterval.getstartTime & ...
+                    times<=theTimeInterval.getendTime;
                 samples(idx)=theTimeInterval.getSampleFor(...
                     times(idx))+lastSample;
                 lastSample=lastSample+theTimeInterval.NumberOfPoints;
@@ -263,18 +291,17 @@ classdef TimeIntervalCombined < time.TimeIntervalAbstract
             samples=obj.getSampleFor(times);
         end
         
-        function time=getEndTime(obj)
-            %METHOD1 Summary of this method goes here
-            %   Detailed explanation goes here
+        function time=getendTime(obj)
+            %get ABSOLUTE end time
             til= obj.timeIntervalList;
             theTimeInterval=til.get(til.length);
-            time=theTimeInterval.getEndTime;
+            time=theTimeInterval.getendTime;
             time.Format=obj.Format;
         end
         function time=getEndTimeZT(obj)
             %METHOD1 Summary of this method goes here
             %   Detailed explanation goes here
-            time=obj.getEndTime-obj.getZeitgeberTime;
+            time=obj.getendTime-obj.getZeitgeberTime;
         end
         
         function ticdnew = plus(obj,varargin)
@@ -321,10 +348,10 @@ classdef TimeIntervalCombined < time.TimeIntervalAbstract
                 end
             end
         end
-        function startTime=getStartTime(obj)
+        function startTime=getstartTime(obj)
             til= obj.timeIntervalList;
             theTimeInterval=til.get(1);
-            startTime=theTimeInterval.getStartTime;
+            startTime=theTimeInterval.getstartTime;
         end
         function startTime=getStartTimeZT(obj)
             til= obj.timeIntervalList;
@@ -340,7 +367,7 @@ classdef TimeIntervalCombined < time.TimeIntervalAbstract
                 else
                     residualprev=residualthis;
                     residualtime=seconds(residualprev/theTimeInterval.SampleRate);
-                    theTimeInterval.StartTime=theTimeInterval.StartTime-residualtime;
+                    theTimeInterval.startTime=theTimeInterval.startTime-residualtime;
                     theTimeInterval.NumberOfPoints=...
                         theTimeInterval.NumberOfPoints+residualprev;
                 end
@@ -357,10 +384,10 @@ classdef TimeIntervalCombined < time.TimeIntervalAbstract
         end
         function tps=getTimePoints(obj)
             til= obj.timeIntervalList;
-            st=obj.getStartTime;
+            st=obj.getstartTime;
             for iInt=1:til.length
                 theTimeInterval=til.get(iInt);
-                tp=theTimeInterval.getTimePoints+theTimeInterval.getStartTime-st;
+                tp=theTimeInterval.getTimePoints+theTimeInterval.getstartTime-st;
                 if exist('tps','var')
                     tps=horzcat(tps, tp); %#ok<*AGROW> 
                 else
@@ -374,14 +401,22 @@ classdef TimeIntervalCombined < time.TimeIntervalAbstract
                 theTimeInterval=til.get(iInt);
                 tp=theTimeInterval.getTimePointsZT;
                 if exist('tps','var')
-                    tps=horzcat(tps, tp); %#ok<*AGROW> 
+                    tps=horzcat(tps, tp); %#ok<*AGROW>
                 else
                     tps=tp;
                 end
             end
         end
-        function tps=getTimePointsInAbsoluteTimes(obj)
-            tps=obj.getTimePoints+obj.getStartTime;
+        function tps=getTimePointsInAbsoluteTimes(obj,index)
+
+            if exist('index','var')
+                tps = obj.getTimePoints;
+                tps = tps(index);
+                tps = tps + obj.getStartTime;
+            else
+                tps=obj.getTimePoints+obj.getstartTime;
+            end
+
         end
         function tps=getTimePointsInSamples(obj)
             tps=1:obj.getNumberOfPoints;
@@ -397,8 +432,8 @@ classdef TimeIntervalCombined < time.TimeIntervalAbstract
                     sample(iAdj).end=theTimeInterval.NumberOfPoints;
                 else
                     tiprev=til.get(iAdj-1);
-                    adjustinthis=seconds(theTimeInterval.getStartTime- ...
-                        tiprev.getEndTime)*obj.getSampleRate;
+                    adjustinthis=seconds(theTimeInterval.getstartTime- ...
+                        tiprev.getendTime)*obj.getSampleRate;
                     sample(iAdj).adj=sample(iAdj-1).adj+adjustinthis;
                     sample(iAdj).begin=sample(iAdj-1).end+1;
                     sample(iAdj).end=sample(iAdj).begin+theTimeInterval.NumberOfPoints;
@@ -408,7 +443,7 @@ classdef TimeIntervalCombined < time.TimeIntervalAbstract
             end
         end
         function ti=mergeTimeIntervals(obj)
-            ti=time.TimeInterval(obj.getStartTime, obj.getSampleRate, ...
+            ti=time.TimeInterval(obj.getstartTime, obj.getSampleRate, ...
                 obj.getNumberOfPoints);
         end
         
@@ -491,7 +526,12 @@ classdef TimeIntervalCombined < time.TimeIntervalAbstract
                 tilnew.add(ti);
             end
             obj.timeIntervalList=tilnew;
-        end        
+        end  
+
+                function [] = getStartTime()
+        end
+        function [] = getEndTime()
+        end
     end
     methods
 

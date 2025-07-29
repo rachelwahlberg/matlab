@@ -45,15 +45,28 @@ classdef SpikeFactory
             theFile=dir(fullfile(foldername,['*TimeIntervalCombined*' '.csv'])); %TIC file gives timing info for each pre-merge file
             %theFile=dir(fullfile(foldername,'..',['*TimeIntervalCombined*' '.csv']));
             if isempty(theFile)
-                theFile=dir(fullfile(foldername,'..','..',['*TimeIntervalCombined*' '.csv']));
+                theFile=dir(fullfile(foldername,'..',['*TimeIntervalCombined*' '.csv']));
+                logger.warning('double check your ticd file')
                 if isempty(theFile)
-                    theFile=dir(fullfile(foldername,'..','..','..',['*TimeIntervalCombined*' '.csv']));
-                else
-                    logger.warning(strcat('TimeIntervalCombined is not loaded. \n\tLocation:\t',foldername,'\n'));
+                    theFile=dir(fullfile(foldername,'..','..',['*TimeIntervalCombined*' '.csv']));
+                    logger.warning('double check your ticd file')
+                    if isempty(theFile)
+                        theFile=dir(fullfile(foldername,'..','..','..',['*TimeIntervalCombined*' '.csv']));
+                        logger.warning('double check your ticd file')
+                    else
+                        logger.warning(strcat('TimeIntervalCombined is not loaded. \n\tLocation:\t',foldername,'\n'));
+                    end
                 end
             end
             ticd=TimeIntervalCombined(fullfile(theFile.folder, theFile.name)); % from the neuro.time folder
-            ticd = ticd.setZeitgeberTime(hours(12)); % for noon start, dark to light transition
+            
+            disp('input zt for SpikeFactory')
+                prompt = {'Zeitgeber Time:'};
+            dlgtitle = 'title';
+            dims = [1 10];
+            definput = {'12:00'};
+            zt = duration(inputdlg(prompt,dlgtitle,dims,definput),'InputFormat','hh:mm');
+            ticd = ticd.setZeitgeberTime(zt); % for noon start, dark to light transition
 
             logger.info(['time is loaded.' ticd.tostring])
            

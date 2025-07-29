@@ -1,0 +1,124 @@
+function Turns = directionsCircularTrackRadians(positionData,plotPeaks)
+%%% get turn times/direction given angle %%%%%%%%%%%%%%%%
+%Turns.TurnLocation = location (in rad) when turn occurs
+%Turns.Index = index into positionData length vector
+%Turns.TimestampsZT = zt timestamp
+%Turns.Direction = 0 if turns counterclockwise and 1 if turns
+%clockwise
+
+x = positionData.data.X - .50;
+z = positionData.data.Z - .50;
+
+theta = atan2(z,x);
+circdiff = diff(theta);
+boundaryJump = circdiff>pi | circdiff < -pi; %jumps between consecutive pts over half a track..indicates likely a 0 to 2pi jump
+
+tmpTheta = theta;
+tmpTheta(boundaryJump) = nan; % so that code doesn't consider boundary (0/2pi) jumps to be peaks
+
+[maxima,maxIndex] = findpeaks(tmpTheta,'MinPeakProminence',.64);%
+[minima,minIndex] = findpeaks(-tmpTheta,'MinPeakProminence',.64,'WidthReference','halfprom','Annotate','extents');
+minima = -minima; %because -theta
+
+ztTime = seconds(positionData.time.getTimePointsZT);
+
+turnClockwiseZT = ztTime(maxIndex)';
+turnCounterZT = ztTime(minIndex)';
+
+allTurns = [maxima;minima];
+allTurns(:,2) = [maxIndex; minIndex]; %indices into full position timestamps
+allTurns(:,3) = [turnClockwiseZT; turnCounterZT]; %zt timestamps
+allTurns(:,4) = 0;
+allTurns(1:length(turnClockwiseZT),4) = 1; %which direction
+allTurnsSorted = sortrows(allTurns,3);%sort by timestamp
+
+%manually refine results to ensure alternation in direction
+t = 1;
+direction = allTurnsSorted(:,4);
+manualTurns = zeros(1,4);
+for turn = 1:length(direction)
+    if turn == length(direction)
+        break
+    end
+
+    if direction(turn) == 1 %clockwise
+        if direction(turn+1) == 0
+            continue
+        elseif direction(turn+1) == 1
+            npeaks = ceil((allTurns(turn+1,3)-allTurns(turn,3))/10); %find more peaks for longer breaks
+            [segmentPeak,pkIdx] = findpeaks(-tmpTheta(allTurnsSorted(turn,2):allTurnsSorted(turn+1,2)),...
+                "NPeaks",npeaks,'MinPeakProminence',.1);
+            [segmentPeak,tmpIdx] = max(-segmentPeak);%- to convert back
+            pkIdx = pkIdx(tmpIdx);
+            manualTurns(t,1) = segmentPeak;
+            manualTurns(t,2) = allTurnsSorted(turn,2)+pkIdx-1; %get index into full array
+            manualTurns(t,3) = ztTime(manualTurns(t,2)); %get timestamp
+            manualTurns(t,4) = 0; %counter
+
+            t = t+1;
+        end
+    end
+
+    if direction(turn) == 0 %counterclockwise
+        if direction(turn+1) == 1
+            continue
+        elseif direction(turn+1) == 0
+            npeaks = ceil((allTurns(turn+1,3)-allTurns(turn,3))/10); %find more peaks for longer breaks
+            [segmentPeak,pkIdx] = findpeaks(tmpTheta(allTurnsSorted(turn,2):allTurnsSorted(turn+1,2)),...
+                "NPeaks",npeaks,'MinPeakProminence',.1);
+            [segmentPeak,tmpIdx] = max(segmentPeak); 
+            pkIdx = pkIdx(tmpIdx);
+            manualTurns(t,1) = segmentPeak;
+            manualTurns(t,2) = allTurnsSorted(turn,2)+pkIdx-1; %get index into full array
+            manualTurns(t,3) = ztTime(manualTurns(t,2)); %get timestamp
+            manualTurns(t,4) = 1; %clockwise
+
+            t = t+1;
+        end
+    end
+end
+
+allTurns = [allTurns; manualTurns];
+allTurnsSorted = sortrows(allTurns,3);%sort by timestamp
+
+%1 = CLOCKWISE 0 = COUNTERCLOCKWISE
+Turns = array2table(allTurnsSorted,"VariableNames",{'LocationInRadians','Index','TimestampZT','Direction'});
+
+if exist("plotPeaks","var")
+
+    counterIdx = find(Turns.Direction == 0);
+    clockwiseIdx = find(Turns.Direction == 1);
+
+    figure
+    plot(ztTime,theta,'b')
+    hold on
+    title('Direction Turns')
+    xlabel('ZT time')
+    ylabel('Radians')
+    scatter(Turns.TimestampZT(clockwiseIdx),Turns.LocationInRadians(clockwiseIdx),'r','filled')
+    scatter(Turns.TimestampZT(counterIdx),Turns.LocationInRadians(counterIdx),'k','filled')
+    legend({'Position Angle' 'Clockwise turn' 'Counter turn'})
+
+    figure
+    for i = 1:height(Turns)
+        if i == height(Turns)
+            break
+        end
+        segmentIdx = Turns.Index(i):(Turns.Index(i+1)-1);
+        polarplot(theta(segmentIdx),ztTime(segmentIdx))
+       hold on
+    end
+    polarplot(Turns.LocationInRadians(clockwiseIdx),Turns.TimestampZT(clockwiseIdx),'*r')
+    polarplot(Turns.LocationInRadians(counterIdx),Turns.TimestampZT(counterIdx),'*k')
+    ax = gca;
+    ax.ThetaAxisUnits = "radians";
+end
+
+
+
+%get pause locations - more fine minima detection than the
+%clockwise/counterclockwise.
+
+
+
+end

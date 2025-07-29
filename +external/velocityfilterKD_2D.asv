@@ -1,0 +1,38 @@
+function [abovethresh_nspks,goodindex,belowthresh_nspks,badindex] = velocityfilterKD(xyt,nspk,thresh)
+%must be AT LEAST the threshold - eliminates slower values
+
+%take the differential of x values and then y values to determine points
+%for which speed is below the provided threshold
+
+
+timeDiffS
+
+badindex = find(abs(diff(xyt(:,1)))<thresh | abs(diff(xyt(:,2)))<thresh); %added in for 2D
+
+badindex = find(abs(diff(xyt(:,1)))<thresh | abs(diff(xyt(:,2)))<thresh); %added in for 2D
+goodindex = find(abs(diff(xyt(:,1)))>=thresh & abs(diff(xyt(:,2)))>=thresh);
+
+
+belowthresh_nspks = zeros(size(nspk));
+belowthresh_nspks(badindex) = nspk(badindex); %the below
+nspk(badindex)=0;
+nspk(badindex+1)=0; % just to be safe
+
+abovethresh_nspks = nspk;
+
+
+
+
+  data = table2array(obj.getData)'; %get x,y,z coordinates
+            timeDiffSeconds = diff(seconds(obj.time.getTimePoints));
+            timeDiffSeconds2=[timeDiffSeconds median(timeDiffSeconds)];
+            squaredDiffs = zeros(size(data));
+            for dimIndex = 1:size(data, 1)
+                squaredDiffs(dimIndex, 1:(end-1) )= diff(data(dimIndex, :)).^2;
+            end %combines over x,y,z dimensions
+            speeds = sqrt(sum(squaredDiffs, 1))./timeDiffSeconds2;
+            if exist('smoothingWindowInSeconds', 'var')
+                speeds = smoothdata(speeds, 'gaussian', obj.time.getSampleRate * ...
+                    smoothingWindowInSeconds);
+            end
+            velocity = neuro.basic.Channel('Velocity', speeds, obj.time);

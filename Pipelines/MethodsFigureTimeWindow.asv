@@ -1,0 +1,40 @@
+classdef MethodsFigureTimeWindow < MethodsFigure
+
+    % created in order to clone methodsFigure for a version with a specific
+    % timewindow.
+
+    properties
+    end
+
+
+    methods
+
+        function obj = MethodsFigureTimeWindow(MethodsFigure,timeWindow)
+            %timeWindow must be created within MethodsFigure.
+            %To see implementation of methodsFigure, see FigureScript (RW)
+
+
+            obj.positionData = obj.positionData.getTimeWindow(timeWindow);
+            obj.positionDataLinearized = obj.positionDataLinearized.getTimeWindow(timeWindow);
+            obj.LFP = obj.LFP.getTimeWindow(timeWindow);
+
+        end
+
+
+
+
+    end
+
+
+
+
+
+
+
+
+
+
+
+
+
+end

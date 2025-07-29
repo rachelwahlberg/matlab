@@ -93,8 +93,10 @@ if ~exist('basepath','var')
     if isequal(basepath,0);return;end  
 end
 
-if ~isempty(dir([basepath '*.lfp']))
-    recordingname = dir([basepath '*.lfp']).name;    
+if ~isempty(dir([basepath '/*.lfp']))
+    recordingname = dir([basepath '/*.lfp']).name; 
+elseif ~isempty(dir([basepath '/*1250Hz.lfp']))
+    recordingname = dir([basepath '/*1250Hz.lfp']).name;    
 elseif ~isempty(dir([basepath '*.eeg']))
     recordingname = dir([basepath '*.eeg']).name;
 else
@@ -244,7 +246,7 @@ EMGFromLFP = bz_EMGFromLFP(basepath,'overwrite',overwrite,...
 %% DETERMINE BEST SLOW WAVE AND THETA CHANNELS
 %Determine the best channels for Slow Wave and Theta separation.
 %Described in Watson et al 2016, with modifications
-SleepScoreLFP = PickSWTHChannel_RW(basepath,recordingname,...
+SleepScoreLFP = preprocess.PickSWTHChannel_RW(basepath,recordingname,...
                             scoretime,SWWeightsName,...
                             Notch60Hz,NotchUnder3Hz,NotchHVS,NotchTheta,...
                             SWChannels,ThetaChannels,rejectChannels,...

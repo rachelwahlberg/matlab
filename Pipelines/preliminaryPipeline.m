@@ -1,10 +1,11 @@
 %% Preliminary data pipeline
 %% 0a) merge files
 % Run only pre-sorting! 
-usedate = 061423;
-basefolders = getbasefolders(usedate); % adapt to include the variables below to not have to rerun each time
-mergedfilename = '/data/ExperimentsRSW/20230614/merged_20230614';
-OpenEphysPreprocess_RW(basefolders,mergedfilename);
+usedate = 20240625;
+basefolders = preprocess.getbasefolders(usedate); % adapt to include the variables below to not have to rerun each time
+mergedfilename = '/data/ExperimentsRSW/CircularMaze/James/20240625/merged_20240625';
+%mergedfilename = '/data/ExperimentsRSW/20230614/merged_20230614';
+preprocess.OpenEphysPreprocess_RW(basefolders,mergedfilename);
 
 %%% 0b) spyking circus in merged folder - need .params, .prb, .dat, dead.txt (if bad periods)
 %%% 0c) phy in merged folder

@@ -1,7 +1,7 @@
 classdef ChannelTimeDataHard < file.BinarySave
     %ChannelTimeDataHard holding lfp data and provides functions to
     %manipulate it
-    %   Detailed explanation goes here
+    %   Hard refers to hard drive
 
     properties (Access=public)
         Probe
@@ -13,9 +13,14 @@ classdef ChannelTimeDataHard < file.BinarySave
 
     methods
         function newObj = ChannelTimeDataHard(filepath)
+            % if nargin > 1 % THIS ONLY WORKS IF YOU ONLY EVER PASS IN TIME.
+            %     time = varargin{1};
+            % end
+
             if isa(filepath,'neuro.basic.ChannelTimeDataHard')
                 newObj=filepath;
             else
+                %first get the lfp file
                 exts={'.lfp','.eeg','.dat'};
                 logger=logging.Logger.getLogger;
                 if ~exist('filepath','var')
@@ -51,6 +56,7 @@ classdef ChannelTimeDataHard < file.BinarySave
                     thefile=thefile(1);
                 end
 
+                %then get the probe file
                 probe=neuro.probe.Probe(folder);
                 logger.info(['\n\t',probe.toString])
                 chans=probe.getActiveChannels;

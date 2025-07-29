@@ -14,6 +14,7 @@ addParameter(p,'saveMat',false,@islogical);
 addParameter(p,'percentiles',[2.2 99.5],@isnumeric) % defaults manually chosen for 11/23
 addParameter(p,'eventfilename',[],@ischar)
 addParameter(p,'newlfpfilename',[],@ischar)
+addParameter(p,'mergelatency',.3,@isnumeric) %300 ms - if wins are less than this val, they are merged
 
 if isnumeric(varargin{1}) % matrix sent in as M samples x N trials
 addRequired(p,'data',@isnumeric) %or ismatrix?
@@ -29,6 +30,7 @@ parse(p,varargin{:})
 lfp = p.Results.lfp;
 data = lfp.data;
 timestamps = lfp.timestamps;
+
 else
     disp('first argument must be either lfp structure of matrix of samples x trials')
 end
@@ -40,9 +42,8 @@ saveMat = p.Results.saveMat;
 percentiles = p.Results.percentiles;
 eventfilename = p.Results.eventfilename;
 newlfpfilename = p.Results.newlfpfilename;
+mergelatency = p.Results.mergelatency;
 % assign parameters (either defaults or given)
-
-
 
 %% Create windows, take variances
 
@@ -52,18 +53,20 @@ if size(data,2) > 1 % if sent in with multiple channels
     data = single(mean(rawdata,2));
 end
 
-winsize = winsec * lfpsamplingrate;
+winsize = winsec * lfpsamplingrate; %window in seconds * lfpsamplingrate
 
 nWins = floor(length(data)/winsize);
-roundTrace= data(1:nWins*winsize);                                            % multiply total number of windows by window size to get the
+roundTrace= (data(1:nWins*winsize)).^2;  % multiply total number of windows by window size to get the
 % full length of the trace, rounded so no leftovers.
 shapedTrace=reshape(roundTrace,winsize,length(roundTrace)/winsize);         %gives matrix of win x total number of windows
+winPow = abs(hilbert(single(mean(shapedTrace))));
 winVar=var(single(shapedTrace)); % takes variance of each window
 pvar = prctile(winVar,percentiles);                                         % need variance rather than straight values because of flat dropouts.
 % not using z score because the crazy outliers are pulling the mean up
 
-winZ = abs(mean(zscore(shapedTrace)));
-pZ = 0.5e-5;
+winPowZ = abs(zscore(winPow));
+%winZ = abs(zscore(mean(shapedTrace)));
+pZ = 7;
 %% Remove flat parts of signal and extra high parts of signal
 
 % first pass - get index of window numbers, convert into start and end
@@ -72,7 +75,8 @@ pZ = 0.5e-5;
 %artInd = find(winVar(:)>pvar(2)); 
 %firstpass = sort(vertcat(dropoutInd,artInd));
 
-dropoutInd = find(winZ(:)>pZ);
+dropoutInd = find(winPowZ>pZ);
+%dropoutInd = find(winVar(:)>pvar);
 firstpass = dropoutInd;
 
 start1 = firstpass*winsize-(winsize-1); %convert into SAMPLES at starts and ends of windows
@@ -95,7 +99,7 @@ for win = 2:length(firstpass)
     end
 
     % merge periods that are close together
-    if start1(win)-end1(win-1)<5*lfpsamplingrate % if the dif between win end to next win start is < 5 s,
+    if start1(win)-end1(win-1)<lfpsamplingrate/(1/mergelatency) % if the dif between win end to next win start is < .3 s,
         continue
     else
         secondpass(i,2) = end1(win-1);
@@ -107,11 +111,11 @@ end
 % third pass - deleting too small of windows, extending the larger windows
 i = 1;
 for ep = 1:length(secondpass)
-    if secondpass(ep,2) - secondpass(ep,1) < lfpsamplingrate/2 % removing periods that are too short (< 1/2 sec)
+    if secondpass(ep,2) - secondpass(ep,1) < lfpsamplingrate/(1/.05) % removing periods that are too short (< 50 ms)
         continue
     else
-        thirdpass(i,1) = secondpass(ep,1)-lfpsamplingrate; % extending the longer periods to capture full thing
-        thirdpass(i,2) = secondpass(ep,2)+lfpsamplingrate;
+        thirdpass(i,1) = secondpass(ep,1)-ceil(lfpsamplingrate/(1/0.05)); % extending the longer periods to capture full thing. currently specific to 20230614's artifacts!
+        thirdpass(i,2) = secondpass(ep,2)+ceil(lfpsamplingrate/(1/0.2));
         i = i + 1;
     end
 end
@@ -129,6 +133,8 @@ end
 % suggested name, [basename '_removeTimestamps.bad.evt']
 
 finalpass = thirdpass'/lfpsamplingrate * 1000; % into ms
+%finalpassDead = thirdpass'/lfpsamplingrate * 30000;
+
 events.time = single(vertcat(finalpass(:)));
 
 events.description = cell(length(events.time),1);
@@ -139,7 +145,11 @@ end
 
 if eventfilename % have filename end in .evt
 %    WriteEventFileFromTwoColumnEvents (tmpbad2,eventfilename) % Brendon Watson version
-   SaveEvents_RW(eventfilename,events) %a buzcode function
+   utilities.SaveEvents_RW(eventfilename,events) %a buzcode function
+end
+
+if deadfilename %if for PREPHY
+    utilities.SaveDeadFile(deadfilename,finalpass) %need to write
 end
 
 %% save clean LFP file

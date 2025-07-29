@@ -68,10 +68,10 @@ classdef (Abstract) Neuroscope
                 shank=lay.ShankNumber(lay.ChannelNumberComingOutPreAmp==chan1);
                 shankidx=ismember(shanks,shank);
                 s.parameters.neuroscope.channels.channelColors{ichan}.channel.Text=num2str(chan-1);
-                hexcolor=lower( rgb2hex(lineStyles(shankidx,:)));
+                hexcolor=lower(utilities.rgb2hex(lineStyles(shankidx,:)));
                 s.parameters.neuroscope.channels.channelColors{ichan}.color.Text=hexcolor;
                 s.parameters.neuroscope.channels.channelColors{ichan}.anatomyColor.Text=hexcolor;
-                hexcolor=lower( rgb2hex(lineStyles(shankidx,:)/2));
+                hexcolor=lower(utilities.rgb2hex(lineStyles(shankidx,:)/2));
                 s.parameters.neuroscope.channels.channelColors{ichan}.spikeColor.Text=hexcolor;
                 s.parameters.neuroscope.channels.channelOffset{ichan}.channel.Text=num2str(chan-1);
                 s.parameters.neuroscope.channels.channelOffset{ichan}.defaultOffset.Text=num2str(0);
@@ -79,8 +79,8 @@ classdef (Abstract) Neuroscope
             
             [path,name,~]=fileparts(filepath);
             if isfile(fullfile(path,strcat(name,'.nrs'))), delete(fullfile(path,strcat(name,'.nrs'))); end
-            addpath('/data/Toolboxes/struct2xml');
-            struct2xml(s,filepath); 
+            %addpath('/data/Toolboxes/struct2xml');
+            utilities.struct2xml(s,filepath); 
         end
         function [] = createXMLFileNotOrder(obj,filepath,samplingRate)
             obj.samplingRate2=samplingRate;
@@ -130,10 +130,10 @@ classdef (Abstract) Neuroscope
 
                 shank=lay.ShankNumber(lay.ChannelNumberComingOutPreAmp==chan1);
                 s.parameters.neuroscope.channels.channelColors{ichan}.channel.Text=num2str(chan1-1);
-                hexcolor=lower( rgb2hex(lineStyles(shank,:)));
+                hexcolor=lower(utilities.rgb2hex(lineStyles(shank,:)));
                 s.parameters.neuroscope.channels.channelColors{ichan}.color.Text=hexcolor;
                 s.parameters.neuroscope.channels.channelColors{ichan}.anatomyColor.Text=hexcolor;
-                hexcolor=lower( rgb2hex(lineStyles(shank,:)/2));
+                hexcolor=lower(utilities.rgb2hex(lineStyles(shank,:)/2));
                 s.parameters.neuroscope.channels.channelColors{ichan}.spikeColor.Text=hexcolor;
                 s.parameters.neuroscope.channels.channelOffset{ichan}.channel.Text=num2str(chan1-1);
                 s.parameters.neuroscope.channels.channelOffset{ichan}.defaultOffset.Text=num2str(0);
@@ -141,7 +141,7 @@ classdef (Abstract) Neuroscope
             
             [path,name,~]=fileparts(filepath);
             if isfile(fullfile(path,strcat(name,'.nrs'))), delete(fullfile(path,strcat(name,'.nrs'))); end
-            struct2xml(s,filepath); 
+            utilities.struct2xml(s,filepath); 
         end
     end
     methods(Access=private)

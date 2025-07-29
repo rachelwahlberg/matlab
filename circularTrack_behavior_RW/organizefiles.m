@@ -1,0 +1,97 @@
+%Organize files
+
+%% Make new recording directories
+
+d = 'E:\Rachel\CircularTrack\Recording_Rats';
+rat = 'Harry';
+date = '2023-06-18';
+
+mkdir([d '\' rat '\' date])
+mkdir([d '\' rat '\' date '\OpenEphys'])
+mkdir([d '\' rat '\' date '\National_Instruments'])
+mkdir([d '\' rat '\' date '\Videos'])
+mkdir([d '\' rat '\' date '\Figures'])
+mkdir([d '\' rat '\' date '\Motive'])
+
+%% Make new pretraining directories
+
+date = '2023-05-29';
+
+mkdir([d '\' rat '\Pretraining\' date])
+mkdir([d '\' rat '\Pretraining\' date '\National_Instruments'])
+mkdir([d '\' rat '\Pretraining\' date '\Videos'])
+mkdir([d '\' rat '\Pretraining\' date '\Figures'])
+
+%% Move files to new directories depending on matching date
+
+originaldir = 'E:\Rachel\Videos'; %%% CHANGE HERE
+rat = 'Harry'; %%% CHANGE HERE
+
+
+datefilenames = ['E:\Rachel\CircularTrack\Recording_Rats\' rat];
+ratdates = dir(datefilenames);
+
+for i = 1:length(ratdates)
+
+    if strcmp(ratdates(i).name,'.') == 1 || strcmp(ratdates(i).name,'..') == 1
+        continue
+    end
+
+    folderdate = ratdates(i).name;
+    newdir = ['E:\Rachel\CircularTrack\Recording_Rats\' rat '\' folderdate ' \Videos']; %%% CHANGE HERE
+
+    d = dir(originaldir);
+    folderfileformat = datestr(datetime(folderdate,'inputFormat',"yyyy-MM-dd"));
+
+    for j = 1:length(d)
+
+        if strcmp(d(j).name,'.') == 1 || strcmp(d(j).name,'..') == 1
+            continue
+        end
+
+        filedate = d(j).date(1:11);
+
+        if strcmp(filedate,folderfileformat) == 1
+            movefile([originaldir '\' d(j).name],[newdir '\' d(j).name])
+        end
+    end
+
+end
+
+%% Delete test files
+
+d = dir('E:\Rachel\Datapoints\test');
+cd('E:\Rachel\Datapoints\test')
+
+for i = 1:length(d)
+    toks = split(d(i).name,'_');
+    if length(toks) < 4
+        continue
+    end
+    rat = toks{4};
+    if strcmp(rat,'test.txt') == 1 && d(i).bytes < 500
+        delete(d(i).name);
+    end
+end
+
+%%
+
+%add any new files for that rat to its folder%
+foldername = 'E:\Rachel\Figures';
+cd(foldername)
+
+rat = 'petunia';
+movefile(['*' rat '*'],['E:\Rachel\CircularTrack\Recording_Rats\' rat '\Unsorted_Files'])
+
+
+
+
+
+
+
+
+
+
+
+
+

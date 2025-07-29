@@ -171,6 +171,7 @@ classdef Probe < neuro.probe.NeuroscopeLayout & neuro.probe.SpykingCircusLayout 
             siteLayout.ChannelNumberComingOutPreAmp(...
                 ~ismember(siteLayout.ChannelNumberComingOutPreAmp,chans))=nan;
             [~,idx]=ismember(chans,siteLayout.ChannelNumberComingOutPreAmp);
+
             new=1:numel(chans);
             siteLayout.ChannelNumberComingOutPreAmp(idx)=new;
             

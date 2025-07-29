@@ -25,7 +25,7 @@ for ifolder=1:numel(basefolders)
 end
 
 
-dfcl=oerc.mergeBlocksOfChannels(1:128,mergedfilename);
+dfcl=oerc.mergeBlocksOfChannels(1:70,mergedfilename);
 ctdh=neuro.basic.ChannelTimeDataHard(dfcl.getDataFile);
 ctdds=ctdh.getDownSampled(1250);
 % ctdds.getChannel(20).plot;
